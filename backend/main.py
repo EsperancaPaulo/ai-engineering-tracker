@@ -37,12 +37,14 @@ async def validation_error(request, exc):
 
 from tracker import router as tracker_router
 app.include_router(tracker_router)
-FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
-app.mount("/assets", StaticFiles(directory=FRONTEND), name="assets")
+FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+app.mount("/assets", StaticFiles(directory=FRONTEND / "assets", check_dir=False), name="assets")
 
 
 @app.get("/", include_in_schema=False)
 def website():
+    if not (FRONTEND / "index.html").is_file():
+        return JSONResponse(status_code=503, content={"detail": "Frontend build missing. Run npm ci and npm run build in frontend, then restart the server."})
     return FileResponse(FRONTEND / "index.html")
 
 

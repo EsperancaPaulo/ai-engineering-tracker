@@ -1,14 +1,17 @@
 # Testing project teams
 
-The team update is installed locally. The membership migration was approved and applied after creating and verifying a private database backup. Existing records were verified unchanged. Use the steps below to check it in your browser.
+The React interface and team update are installed locally. The frontend framework change requires no additional database migration. The membership migration was approved and applied after creating and verifying a private database backup. Existing records were verified unchanged. Use the steps below to check it in your browser.
 
-## Owner check
+## Interface and owner check
 
 1. Open http://127.0.0.1:8000/ and hard-refresh (Command + Shift + R on macOS), then sign in.
 2. Your existing project and task should still be present. Your project card should show Owner.
 3. Click Team. Your account should be listed as Owner.
 4. Create a test task with Task details and a priority. Confirm its details appear below the title.
-5. Switch My tasks to Team tasks and back. With only your account, these lists can be the same.
+5. Edit the task title/details/priority, save, then change its status and check progress/activity.
+6. Switch My tasks to Team tasks and back. With only your account, these lists can be the same.
+7. Try Pause animation and Resume animation.
+8. Sign out: project/task content should disappear, and signing back in should reload it. Refresh also requires sign-in because tokens stay in memory.
 
 ## Optional second-account checks
 
@@ -28,9 +31,15 @@ Check the rotating illustration and Pause/Resume controls, task search/status fi
 
 ## Automated checks
 
-From backend with the environment active:
+Build and verify the frontend first, then check the backend with its environment active:
 
 ```sh
+cd frontend
+npm ci
+npm test
+npm run build
+cd ../backend
+source .venv/bin/activate
 python -m pytest -q
 python -m pip check
 ```

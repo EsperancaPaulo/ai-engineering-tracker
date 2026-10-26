@@ -1,3 +1,4 @@
+import re
 from test_auth import client, register, login
 
 
@@ -10,11 +11,16 @@ def test_website_and_assets(client):
     response = client.get('/')
     assert response.status_code == 200
     assert 'text/html' in response.headers['content-type']
-    assert 'auth-form' in response.text
+    assert 'id="root"' in response.text
     assert response.headers['x-content-type-options'] == 'nosniff'
     assert "script-src 'self'" in response.headers['content-security-policy']
-    assert client.get('/assets/app.js').status_code == 200
-    assert client.get('/assets/styles.css').status_code == 200
+    assets = re.findall(r'(?:src|href)="(/assets/[^"]+)"', response.text)
+    assert any(path.endswith('.js') for path in assets)
+    assert any(path.endswith('.css') for path in assets)
+    for asset in assets:
+        assert client.get(asset).status_code == 200
+    assert client.get('/assets/src/App.jsx').status_code == 404
+    assert client.get('/assets/package.json').status_code == 404
     assert client.get('/api').json()['message'].endswith('is running')
 
 
@@ -64,3 +70,12 @@ def test_tracker_validation(client):
     assert client.post('/api/tasks',json={'title':'Task','project_id':999},headers=auth).status_code == 404
     assert client.post('/api/tasks',json={'title':'Task','project_id':1,'priority':'urgent'},headers=auth).status_code == 422
     assert client.patch('/api/tasks/999',json={'status':'invalid'},headers=auth).status_code == 422
+
+
+def test_missing_frontend_build_has_clear_error(client, monkeypatch, tmp_path):
+    import main
+    monkeypatch.setattr(main, 'FRONTEND', tmp_path)
+    result = client.get('/')
+    assert result.status_code == 503
+    assert 'Frontend build missing' in result.json()['detail']
+    assert client.get('/health').status_code == 200

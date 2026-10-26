@@ -26,3 +26,8 @@ The installed team update adds project-level membership and Owner/Editor/Viewer 
 Before public deployment, add HTTPS, rate limiting, account recovery/verification, session revocation, team permissions, backup/restore procedures and a deployment security review. Do not expose the development server directly to the internet.
 
 If you find a vulnerability, avoid posting credentials, user data, or exploit details in a public issue. Use a private reporting channel if one is available on the repository.
+
+
+## React frontend
+
+FastAPI serves only compiled files from `frontend/dist/assets` under `/assets`; frontend source files and package configuration are not exposed by that mount. Tokens stay in memory and are cleared on sign-out/expiration. The browser UI hides disallowed actions, but server-side project permissions remain the authority. Frontend source and lockfiles are public; never add secrets to client code, frontend environment variables or generated bundles. Production source maps are disabled. `dist` and `node_modules` remain ignored. Build the frontend before starting the app from a fresh checkout. The React migration performs no database migration or permission changes.

@@ -22,7 +22,7 @@ Build an AI-assisted task and issue tracking system for engineering teams. Use R
 
 ## Important limits of the current foundation
 
-The website uses plain HTML/CSS/JavaScript served by FastAPI; React remains pending. Project-level teams now have Owner, Editor and Viewer permissions. New projects are private until an owner adds registered members. The approved versioned migration added membership and migration-history tables without rewriting original records. Organization-level teams and ownership transfer are not implemented. Activity history is actor-specific, retained, and not a tamper-proof enterprise audit system. Deletion is permanent; nonempty projects cannot be deleted. Private local backups and record-preservation verification were completed before installation. Backup retention, off-device copies and a full operational restore drill remain pending.
+The website now uses React with Vite, with its compiled assets served by FastAPI. Project-level teams now have Owner, Editor and Viewer permissions. New projects are private until an owner adds registered members. The approved versioned migration added membership and migration-history tables without rewriting original records. Organization-level teams and ownership transfer are not implemented. Activity history is actor-specific, retained, and not a tamper-proof enterprise audit system. Deletion is permanent; nonempty projects cannot be deleted. Private local backups and record-preservation verification were completed before installation. Backup retention, off-device copies and a full operational restore drill remain pending.
 
 ## Next milestones
 
@@ -30,7 +30,7 @@ The website uses plain HTML/CSS/JavaScript served by FastAPI; React remains pend
 
 - [x] Deploy project ownership/membership with an approved, versioned additive migration and private database backup.
 - [x] Enforce Owner/Editor/Viewer permissions, controlled assignments and a team task view.
-- [ ] Migrate the existing interface to React while preserving the accepted design and working API.
+- [x] Migrate the interface to React while preserving the accepted green design, animation, API and permissions.
 - [x] Add task descriptions and assignee names to the UI.
 - [ ] Extend issue details with the later GitHub/import workflow.
 - [ ] Define backups, restore and retention before relying on this for team operations.
@@ -75,3 +75,10 @@ The approved team update is installed locally: private new projects, Owner/Edito
 Verification: 62 automated tests passed; PostgreSQL migration/idempotency and isolation passed in a temporary rolled-back schema; browser checks covered the owner/editor screen, descriptions and assignee choices. Live website/API checks confirmed the existing project and task remain, owner membership is correct, team/personal task views work, and unauthenticated access is blocked. A full multi-account browser check is still pending; role restrictions and revocation are covered by automated tests.
 
 Keep completed, verified app updates committed and pushed to GitHub. Exclude real environment settings, database contents, backups and runtime data. React and the remaining integrations/AI milestones above are still pending.
+
+
+## React interface milestone
+
+The complete website is implemented in React components with a locked Vite build. FastAPI serves compiled assets at the existing port 8000 address. The old DOM implementation is removed. This milestone changes no database schema, credentials, existing records or permission rules. The existing green design, orbit animation, account flows, project/task editing and deletion, memberships and assignment controls are preserved.
+
+Verification: 17 frontend tests and 63 backend tests pass. Browser checks covered the built owner/editor interface, saved task edits, completion/progress/activity, team controls, animation and sign-out isolation using copied demo data. Viewer restrictions are covered by automated tests. No AI calls or external notifications have been activated. Next: GitHub issue/import foundations, followed by AI summaries and suggestions with approval controls.

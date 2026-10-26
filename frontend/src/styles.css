@@ -57,3 +57,8 @@
 #team-dialog{max-height:85svh;overflow:auto}
 #team-dialog .field-hint{font-size:11px}
 select:disabled{opacity:.7;cursor:default}
+
+.loading-note{font-size:11px;color:var(--muted);margin:14px 0}
+.member-removal{background:#fff7ef;border:1px solid #efdfce;border-radius:8px;padding:14px;font-size:12px;line-height:1.7}
+#create-form .primary{width:100%;margin-top:25px}
+@media(max-width:760px){.welcome-banner{padding-bottom:44px}}
