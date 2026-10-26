@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import auth
+from human_verification import require_human
 from database import Base
 from main import app
 from models import User
@@ -31,6 +32,7 @@ def client():
         with sessions() as session:
             yield session
     app.dependency_overrides[auth.get_db] = db_override
+    app.dependency_overrides[require_human] = lambda: None
     with TestClient(app) as client:
         client.sessions = sessions
         yield client

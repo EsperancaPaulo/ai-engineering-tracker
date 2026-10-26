@@ -37,6 +37,8 @@ async def validation_error(request, exc):
 
 from tracker import router as tracker_router
 app.include_router(tracker_router)
+from github_imports import router as github_router
+app.include_router(github_router)
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 app.mount("/assets", StaticFiles(directory=FRONTEND / "assets", check_dir=False), name="assets")
 
@@ -57,8 +59,8 @@ async def response_headers(request, call_next):
     response.headers["Cache-Control"] = "no-store"
     if request.url.path == "/":
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; "
-            "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+            "connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         )
     return response

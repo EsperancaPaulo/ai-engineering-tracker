@@ -1,6 +1,6 @@
 # AI Engineering Tracker
 
-A local engineering workspace with FastAPI, PostgreSQL, secure sign-in, project teams, tasks, progress and activity history. The interface uses React with Vite, served by FastAPI. AI assistance, GitHub/Slack and imports remain on the [roadmap](ROADMAP.md).
+A local engineering workspace with FastAPI, PostgreSQL, secure sign-in, project teams, tasks, progress and activity history. The interface uses React with Vite, served by FastAPI. Owners can preview and import public GitHub issues. AI assistance, private GitHub connections and Slack remain on the [roadmap](ROADMAP.md).
 
 ## Setup
 
@@ -79,13 +79,16 @@ Create a private PostgreSQL backup before applying this update. Migration and pr
 
 ## API
 
-- `POST /auth/register`: JSON name, email and password (15–128 characters).
+- `POST /auth/register`: JSON name, email, password (15–128 characters) and a fresh Turnstile `human_token`.
+- `GET /auth/config`: password policy and public human-verification configuration.
 - `POST /auth/login`: form `username` (email) and `password`; returns a bearer JWT.
 - `GET /me`: public profile.
 - `GET/POST /api/projects`, `PUT/DELETE /api/projects/{id}`.
 - `GET /api/tasks?scope=mine` (default), or `scope=team`; `POST /api/tasks`.
 - `PATCH/DELETE /api/tasks/{id}`; PATCH accepts partial title, description, priority, status, project and assigned user ID.
 - `GET/POST /api/projects/{id}/members`; `PUT/DELETE /api/projects/{id}/members/{user_id}`.
+- `POST /api/projects/{id}/github/preview`: Owner-only public repository issue preview.
+- `POST /api/projects/{id}/github/import`: Owner-only import of up to 10 selected issues from the signed preview.
 - `GET /api/activity`: current actor's latest 20 updates.
 
 Send `Authorization: Bearer <access_token>`. Invalid tokens return 401; insufficient member roles return 403; nonmember access returns 404. Validation returns 422; duplicate membership and protected deletions return 409. Successful DELETE returns 204.
@@ -105,7 +108,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The frontend has 17 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 63 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
+The frontend has 27 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 90 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
 
 Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
 
@@ -129,3 +132,17 @@ React components live in `frontend/src/components`, session state in `frontend/s
 For optional hot reload, keep FastAPI running and run `npm run dev` from `frontend`. Vite binds to loopback and proxies API calls to port 8000. Use the development address printed in the terminal, commonly port 5173. For everyday use, rebuild after frontend source changes and keep using port 8000. Build before restarting FastAPI on a fresh checkout. Generated `dist` and `node_modules` are ignored; source and lockfiles are committed. Never put secrets into frontend environment variables or bundles. No frontend `.env` is required. Production build source maps are disabled.
 
 The build setup follows the official [React client app guidance](https://react.dev/learn/build-a-react-app-from-scratch) and [Vite documentation](https://vite.dev/guide/).
+
+## Passwords and human verification
+
+New registrations require a 15–128-character password. Local zxcvbn dictionary and pattern checks reject common or easily guessed passwords, including account-related words. The browser shows feedback and asks for confirmation. These checks do not use AI or send passwords to an external checking service. Existing passwords and sign-in continue to work. Passwords remain Argon2id-hashed; strength estimation is not a breached-password database check.
+
+Create a Managed widget in Cloudflare Turnstile. Add `localhost` and `127.0.0.1` as separate hostnames without protocols or ports, and disable pre-clearance. Save `TURNSTILE_MODE=required`, the real `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and `TURNSTILE_ALLOWED_HOSTNAMES=localhost,127.0.0.1` in the existing private backend `.env`, preserving other settings. Restart the backend after editing environment settings. The public site key is sent to the browser; the secret stays server-side. No frontend environment file is needed.
+
+Registration fails closed when configuration is missing or verification is unavailable. The server verifies each token directly with Cloudflare and checks its registration action, allowed hostname and five-minute validity. Tokens are single use. Cloudflare handles browser challenge data; passwords are not included in verification requests. Existing sign-in does not require Turnstile. Explicit `test` mode is for development only and is labelled in the UI; official dummy keys are rejected in required mode.
+
+## Public GitHub issue import
+
+As project Owner, choose **Import issues**, enter `owner/repository`, and preview open issues. Previewing saves nothing. Review details and source links, select up to 10 issues, then confirm import. Imported tasks start as To do with Medium priority and are assigned to you. The original text and source link are retained. Repeated imports of the same issue into that project are skipped. Deleted imported tasks are still recorded as previously imported.
+
+This uses public GitHub data without credentials and never changes GitHub. Pull requests are excluded. Previews expire after five minutes and are bound to the owner and project. Private repositories, OAuth, automatic synchronization and AI summaries are future work. Requests have timeouts, one bounded retry for transient failures, and rate-limit feedback. No schema migration is required for this update; provenance is stored in existing activity records.

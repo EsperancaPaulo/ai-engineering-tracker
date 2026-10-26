@@ -32,15 +32,16 @@ The website now uses React with Vite, with its compiled assets served by FastAPI
 - [x] Enforce Owner/Editor/Viewer permissions, controlled assignments and a team task view.
 - [x] Migrate the interface to React while preserving the accepted green design, animation, API and permissions.
 - [x] Add task descriptions and assignee names to the UI.
-- [ ] Extend issue details with the later GitHub/import workflow.
+- [x] Extend issue details with reviewed public GitHub imports and source links.
 - [ ] Define backups, restore and retention before relying on this for team operations.
 
 ### 2. Secure connected sources
 
-- [ ] Connect GitHub for issue ingestion and links, starting read-only.
+- [x] Import selected public GitHub issues with preview, source links and duplicate prevention.
+- [ ] Connect private GitHub repositories with minimum-permission credentials.
 - [ ] Add email/file import with previews and validation before saving.
 - [ ] Add secure credential storage, minimum permissions, and clear connection management.
-- [ ] Add integration error handling, bounded retries and duplicate prevention.
+- [x] Add GitHub import error handling, bounded retries and duplicate prevention.
 
 ### 3. AI assistance with human control
 
@@ -74,7 +75,7 @@ The approved team update is installed locally: private new projects, Owner/Edito
 
 Verification: 62 automated tests passed; PostgreSQL migration/idempotency and isolation passed in a temporary rolled-back schema; browser checks covered the owner/editor screen, descriptions and assignee choices. Live website/API checks confirmed the existing project and task remain, owner membership is correct, team/personal task views work, and unauthenticated access is blocked. A full multi-account browser check is still pending; role restrictions and revocation are covered by automated tests.
 
-Keep completed, verified app updates committed and pushed to GitHub. Exclude real environment settings, database contents, backups and runtime data. React and the remaining integrations/AI milestones above are still pending.
+Keep completed, verified app updates committed and pushed to GitHub. Exclude real environment settings, database contents, backups and runtime data. The remaining integrations/AI milestones above are still pending.
 
 
 ## React interface milestone
@@ -82,3 +83,7 @@ Keep completed, verified app updates committed and pushed to GitHub. Exclude rea
 The complete website is implemented in React components with a locked Vite build. FastAPI serves compiled assets at the existing port 8000 address. The old DOM implementation is removed. This milestone changes no database schema, credentials, existing records or permission rules. The existing green design, orbit animation, account flows, project/task editing and deletion, memberships and assignment controls are preserved.
 
 Verification: 17 frontend tests and 63 backend tests pass. Browser checks covered the built owner/editor interface, saved task edits, completion/progress/activity, team controls, animation and sign-out isolation using copied demo data. Viewer restrictions are covered by automated tests. No AI calls or external notifications have been activated. Next: GitHub issue/import foundations, followed by AI summaries and suggestions with approval controls.
+
+## Registration security and public import milestone
+
+New-account passwords are checked locally for length and guessability without AI. Password confirmation and feedback are included; existing credentials are preserved. Real Cloudflare Turnstile is required for new registrations when configured, with server-side token validation and fail-closed setup. Real challenge completion is a manual acceptance check. Owners can review and explicitly import selected open issues from public GitHub repositories; imports preserve source links and skip duplicates. No database migration, private GitHub access, AI processing or notifications are part of this milestone. Automated verification: 27 frontend tests and 90 backend tests.

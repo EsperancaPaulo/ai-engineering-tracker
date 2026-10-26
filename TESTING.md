@@ -45,3 +45,24 @@ python -m pip check
 ```
 
 The suite uses separate SQLite databases and test signing secrets. PostgreSQL migration and nonmember isolation have also been verified in a temporary schema that was rolled back. These checks do not substitute for a backup or full operational restore drill.
+
+## Password and human-verification checks
+
+1. Hard-refresh the app, sign out, and select Create account.
+2. Try a common password such as `Password123456789!`. The local feedback should reject it. Use a unique long passphrase or password-manager-generated password instead; do not reuse the example.
+3. Confirm the password. A mismatch must prevent submission.
+4. Complete the real Cloudflare human-verification widget yourself. Account creation must remain blocked without a successful check.
+5. Create a disposable test account, then sign in and confirm its projects start empty. Existing accounts should still sign in normally.
+6. If verification expires or fails, retry it before resubmitting. Do not share passwords, tokens or secret keys.
+
+The automated suites cover missing configuration, invalid/expired/wrong-action/wrong-host tokens, verification outages, password validation and secret-free errors using isolated databases and mocked Cloudflare responses. A real browser challenge still needs the human tester.
+
+## Public issue-import checks
+
+1. Sign in as Owner and choose Import issues on a disposable project.
+2. Enter a public `owner/repository` with open issues and preview. Confirm no task is saved yet.
+3. Select one issue and confirm import. Check title, details, source link, To do status, Medium priority and your assignment.
+4. Preview again: the same issue must show as already imported. Editors and Viewers should not see import controls; the API also enforces this restriction.
+5. Invalid repository input, unavailable repositories and expired previews should show useful errors without creating tasks.
+
+Current automated verification: 27 frontend tests and 90 backend tests.

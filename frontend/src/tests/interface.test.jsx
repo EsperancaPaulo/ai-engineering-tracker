@@ -8,6 +8,7 @@ import Workspace from '../components/Workspace.jsx';
 import ItemDialog from '../components/ItemDialog.jsx';
 import TeamDialog from '../components/TeamDialog.jsx';
 import DeleteDialog from '../components/DeleteDialog.jsx';
+vi.mock('../components/HumanVerification.jsx',()=>({default:function Human({onToken}){React.useEffect(()=>onToken('fixture-human-token'),[onToken]);return <div>Verification fixture</div>;}}));
 const user={id:1,name:'Test Owner'};
 const project={id:1,name:'Engineering project',description:'A useful project',role:'owner'};
 const task={id:1,title:'Original task',description:'Acceptance criteria',project_id:1,assigned_to:1,assignee_name:'Test Owner',priority:'medium',status:'done',can_edit:true};
@@ -20,6 +21,7 @@ function workspaceApi(role='owner') {return vi.fn(async path=>{
  return {};
 });}
 function appFetch(expires=1800){return vi.fn(async path=>{
+ if(path==='/auth/config')return Response.json({human_verification:{ready:true,mode:'required',site_key:'fixture-public-key'}});
  if(path==='/auth/login')return Response.json({access_token:'temporary-test-token',expires_in:expires});
  if(path==='/me')return Response.json(user);
  return Response.json(await workspaceApi()(path));
@@ -28,9 +30,9 @@ async function credentials(actor){await actor.type(screen.getByLabelText('Email 
 it('registers without a client role and uses the OAuth email form',async()=>{
  const actor=userEvent.setup(),signedIn=vi.fn(),fetch=appFetch();vi.stubGlobal('fetch',fetch);render(<Auth onSignIn={signedIn}/>);
  await actor.click(screen.getByRole('button',{name:'Create account',exact:true}));await actor.type(screen.getByLabelText('Your name'),'Test Owner');
- await actor.type(screen.getByLabelText('Email address'),'test@example.com');await actor.type(screen.getByLabelText('Password'),'test-only-long-passphrase');await actor.click(within(document.querySelector('#auth-form')).getByRole('button',{name:'Create account',exact:true}));
+ await actor.type(screen.getByLabelText('Email address'),'test@example.com');await actor.type(screen.getByLabelText('Password'),'test-only-long-passphrase');await actor.type(screen.getByLabelText('Confirm password'),'test-only-long-passphrase');await waitFor(()=>expect(within(document.querySelector('#auth-form')).getByRole('button',{name:'Create account',exact:true}).disabled).toBe(false));await actor.click(within(document.querySelector('#auth-form')).getByRole('button',{name:'Create account',exact:true}));
  await waitFor(()=>expect(signedIn).toHaveBeenCalledOnce());
- expect(JSON.parse(fetch.mock.calls.find(([p])=>p==='/auth/register')[1].body)).toEqual({name:'Test Owner',email:'test@example.com',password:'test-only-long-passphrase'});
+ expect(JSON.parse(fetch.mock.calls.find(([p])=>p==='/auth/register')[1].body)).toEqual({name:'Test Owner',email:'test@example.com',password:'test-only-long-passphrase',human_token:'fixture-human-token'});
  expect(fetch.mock.calls.find(([p])=>p==='/auth/login')[1].body.get('username')).toBe('test@example.com');
 });
 it('keeps a failed login on the sign-in screen',async()=>{

@@ -1,9 +1,12 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator, model_validator
 
 
 def normalize_email(value: str) -> str:
     return value.strip().lower()
+
+
+from password_policy import password_problem
 
 
 class Registration(BaseModel):
@@ -11,6 +14,15 @@ class Registration(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     email: EmailStr = Field(max_length=255)
     password: SecretStr = Field(min_length=15, max_length=128)
+
+    human_token: SecretStr | None = Field(default=None, max_length=2048)
+
+    @model_validator(mode="after")
+    def strong_password(self):
+        problem = password_problem(self.password.get_secret_value(), self.name, str(self.email))
+        if problem:
+            raise ValueError(problem)
+        return self
 
     @field_validator("name", mode="before")
     @classmethod
