@@ -21,7 +21,7 @@ The check inspects the Git index, compares it against local environment values w
 
 ## Current application limits
 
-Authentication, task ownership checks, validated inputs, safe public profile responses, and browser response headers are implemented. Team/project ownership and full role-based permissions are still pending: all signed-in users currently share projects, may edit them, and may delete empty projects. Tasks are restricted to their assigned user. AI and third-party integrations are not yet connected.
+The installed team update adds project-level membership and Owner/Editor/Viewer checks on each request. New projects are private until an owner adds registered members. Editors contribute their own work and viewers cannot write. Only owners manage access/assignments and delete empty projects. Owner removal/demotion is blocked; all tasks must be reassigned before removing a member. The global user role does not bypass project permissions. The additive migration needs an authorized legacy owner choice when there are multiple existing users; back up before applying it. Organization-wide administration, ownership transfer and AI/third-party integrations remain pending. Changes to existing real ownership/access permissions require explicit approval before deployment; the initial local ownership migration was approved and verified.
 
 Before public deployment, add HTTPS, rate limiting, account recovery/verification, session revocation, team permissions, backup/restore procedures and a deployment security review. Do not expose the development server directly to the internet.
 

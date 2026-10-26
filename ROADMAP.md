@@ -22,16 +22,17 @@ Build an AI-assisted task and issue tracking system for engineering teams. Use R
 
 ## Important limits of the current foundation
 
-The website currently uses plain HTML/CSS/JavaScript served by FastAPI. React has NOT yet been implemented. Projects are shared with all authenticated users; the database has no project owner or team membership yet, so all signed-in users can edit shared projects and delete empty ones. Tasks can only be changed by their assigned user. Users have a role field, but full role-based permissions and team administration are NOT implemented. Activity history is retained but is not a tamper-proof enterprise audit system. Deletion is permanent; audit entries are not an undo feature. A nonempty project cannot be deleted, even if its remaining tasks belong to another user. No existing database tables are migrated for the current management milestone.
+The website uses plain HTML/CSS/JavaScript served by FastAPI; React remains pending. Project-level teams now have Owner, Editor and Viewer permissions. New projects are private until an owner adds registered members. The approved versioned migration added membership and migration-history tables without rewriting original records. Organization-level teams and ownership transfer are not implemented. Activity history is actor-specific, retained, and not a tamper-proof enterprise audit system. Deletion is permanent; nonempty projects cannot be deleted. Private local backups and record-preservation verification were completed before installation. Backup retention, off-device copies and a full operational restore drill remain pending.
 
 ## Next milestones
 
 ### 1. Team-ready core
 
-- [ ] Introduce explicit project/team ownership and membership with safe migrations for existing data.
-- [ ] Enforce role-based permissions server-side; add controlled task assignment and a team issue view.
+- [x] Deploy project ownership/membership with an approved, versioned additive migration and private database backup.
+- [x] Enforce Owner/Editor/Viewer permissions, controlled assignments and a team task view.
 - [ ] Migrate the existing interface to React while preserving the accepted design and working API.
-- [ ] Add task descriptions to the UI and issue details appropriate to the team workflow.
+- [x] Add task descriptions and assignee names to the UI.
+- [ ] Extend issue details with the later GitHub/import workflow.
 - [ ] Define backups, restore and retention before relying on this for team operations.
 
 ### 2. Secure connected sources
@@ -65,3 +66,12 @@ The website currently uses plain HTML/CSS/JavaScript served by FastAPI. React ha
 ## Working rules
 
 Preserve existing user records and secrets. Do not publish the local database or credentials. Keep important AI decisions subject to human approval. Do not activate external notifications without the user's authorization. Keep the UI plain and useful. Finish and verify one milestone before describing it as delivered.
+
+
+## Team-permissions milestone delivered
+
+The approved team update is installed locally: private new projects, Owner/Editor/Viewer roles, registered-member management, owner-controlled assignments, team task views and task descriptions. The pre-existing sole account became Owner of its existing project. A private PostgreSQL backup was archive-verified before migration; full fingerprints confirmed every original user, project, task and activity row remained unchanged.
+
+Verification: 62 automated tests passed; PostgreSQL migration/idempotency and isolation passed in a temporary rolled-back schema; browser checks covered the owner/editor screen, descriptions and assignee choices. Live website/API checks confirmed the existing project and task remain, owner membership is correct, team/personal task views work, and unauthenticated access is blocked. A full multi-account browser check is still pending; role restrictions and revocation are covered by automated tests.
+
+Keep completed, verified app updates committed and pushed to GitHub. Exclude real environment settings, database contents, backups and runtime data. React and the remaining integrations/AI milestones above are still pending.

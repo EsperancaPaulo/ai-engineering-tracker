@@ -54,8 +54,8 @@ def test_user_isolation(client):
     assert client.get('/api/tasks',headers=second).json() == []
     assert client.get('/api/activity',headers=second).json() == []
     assert client.patch(f"/api/tasks/{task['id']}",json={'status':'done'},headers=second).status_code == 404
-    assert len(client.get('/api/projects',headers=second).json()) == 1
-    assert client.post('/api/tasks',json={'title':'Try assigning','project_id':project['id'],'assigned_to':1},headers=second).status_code == 422
+    assert client.get('/api/projects',headers=second).json() == []
+    assert client.post('/api/tasks',json={'title':'Try assigning','project_id':project['id'],'assigned_to':1},headers=second).status_code == 404
 
 
 def test_tracker_validation(client):

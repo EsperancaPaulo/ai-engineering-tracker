@@ -57,9 +57,9 @@ def test_cannot_change_or_delete_another_users_task(client):
     path=f"/api/tasks/{task['id']}"
     assert client.patch(path,json={'title':'Stolen'},headers=other).status_code == 404
     assert client.delete(path,headers=other).status_code == 404
-    # Even a member with no visible tasks cannot remove a nonempty shared project.
+    # Nonmembers cannot see or delete this project.
     assert client.get('/api/tasks',headers=other).json() == []
-    assert client.delete(f"/api/projects/{project['id']}",headers=other).status_code == 409
+    assert client.delete(f"/api/projects/{project['id']}",headers=other).status_code == 404
     assert client.get('/api/tasks',headers=first).json()[0]['title'] == 'Original task'
     assert client.get('/api/activity',headers=other).json() == []
 

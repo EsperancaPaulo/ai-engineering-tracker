@@ -5,7 +5,10 @@ from sqlalchemy import (
     Integer,
     ForeignKey,
     DateTime,
-    Text
+    Text,
+    CheckConstraint,
+    Index,
+    text
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -71,3 +74,23 @@ class ActivityLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )
+
+
+class ProjectMember(Base):
+    __tablename__ = 'project_members'
+    project_id: Mapped[int] = mapped_column(ForeignKey('projects.id', ondelete='CASCADE'), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), primary_key=True)
+    role: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    __table_args__ = (
+        CheckConstraint("role IN ('owner', 'editor', 'viewer')", name='project_member_role'),
+        Index('one_owner_per_project', 'project_id', unique=True,
+              postgresql_where=text("role = 'owner'"), sqlite_where=text("role = 'owner'")),
+    )
+
+
+class AppMigration(Base):
+    __tablename__ = 'app_migrations'
+    version: Mapped[str] = mapped_column(String(80), primary_key=True)
+    applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
