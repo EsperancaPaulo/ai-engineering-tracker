@@ -66,3 +66,6 @@ select:disabled{opacity:.7;cursor:default}
 .password-meter{height:5px;border-radius:5px;background:#e8edde;margin-top:12px;overflow:hidden}.password-meter span{display:block;height:100%;background:#689364;transition:width .2s}.human-check{margin-top:18px}.human-check>div{min-height:65px}
 
 .item-actions{flex-wrap:wrap}.github-issues{margin:18px 0;max-height:40svh;overflow:auto}.github-issue{padding:14px 0;border-bottom:1px solid var(--line)}.github-issue label{display:flex;gap:10px;align-items:flex-start;margin:0;font-size:12px}.github-issue input{width:auto;margin-top:3px}.github-issue small{display:block;color:var(--muted);font-weight:400}.github-issue a{font-size:10px;text-decoration:underline;display:inline-block;margin:10px 0}.github-issue details{font-size:11px;color:var(--muted)}.github-issue details p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin-top:10px}.import-pagination{display:flex;justify-content:space-between;margin:15px 0}#github-repository{margin-bottom:12px}
+/* Allow verification and long feedback to fit within the two-column account view. */
+.auth-layout{grid-template-columns:repeat(2,minmax(0,1fr))}.auth-panel,.auth-card{min-width:0}.human-check{max-width:100%}
+@media(max-width:760px){.auth-layout{grid-template-columns:minmax(0,1fr)}}
