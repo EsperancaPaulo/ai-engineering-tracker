@@ -1,10 +1,19 @@
 # AI Engineering Tracker
 
-A local engineering workspace with FastAPI, PostgreSQL, secure sign-in, project teams, tasks, progress and activity history. The current interface uses HTML/CSS/JavaScript. The React migration, AI assistance, GitHub/Slack and imports remain on the [roadmap](ROADMAP.md).
+A local engineering workspace with FastAPI, PostgreSQL, secure sign-in, project teams, tasks, progress and activity history. The interface uses React with Vite, served by FastAPI. AI assistance, GitHub/Slack and imports remain on the [roadmap](ROADMAP.md).
 
 ## Setup
 
-From the project root:
+Use Python 3.14 and Node.js 22.12+ (Node 24 was used for verification). Build the React interface first, from the project root:
+
+```sh
+cd frontend
+npm ci
+npm run build
+cd ..
+```
+
+Then set up the backend:
 
 ```sh
 cd backend
@@ -35,7 +44,7 @@ python migrate.py
 uvicorn main:app --reload
 ```
 
-Open http://127.0.0.1:8000/ for the website, or http://127.0.0.1:8000/docs for API testing. No separate frontend server is required. API status is at `/api`; `/health` remains available.
+Open http://127.0.0.1:8000/ for the website, or http://127.0.0.1:8000/docs for API testing. FastAPI serves the built React interface from `frontend/dist`; no separate frontend server is required. If the build is missing, the home route returns a clear 503 message while API routes remain available. API status is at `/api`; `/health` remains available.
 
 ## Project teams
 
@@ -83,16 +92,24 @@ Send `Authorization: Bearer <access_token>`. Invalid tokens return 401; insuffic
 
 ## Tests and dependencies
 
-From `backend` with the virtual environment active:
+From the repository root, verify the frontend and build it before running backend asset checks:
 
 ```sh
+cd frontend
+npm ci
+npm test
+npm run build
+cd ../backend
+source .venv/bin/activate
 python -m pytest -q
 python -m pip check
 ```
 
-Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. Browser checks cover project privacy copy, team management, task descriptions and assignee choices. Viewer rules are covered by automated tests; a complete multi-account browser check is still pending.
+The frontend has 17 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 63 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
 
-Dependencies are bounded in `requirements.txt`; development tools in `requirements-dev.txt`. FastAPI/Pydantic provide routing/validation, SQLAlchemy/psycopg database access, python-dotenv local settings, pwdlib with Argon2 hashing, PyJWT tokens, email-validator address validation, and python-multipart login forms. Tested with Python 3.14. Ranges are not a full lockfile.
+Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
+
+Dependencies are bounded in `requirements.txt`; development tools in `requirements-dev.txt`. FastAPI/Pydantic provide routing/validation, SQLAlchemy/psycopg database access, python-dotenv local settings, pwdlib with Argon2 hashing, PyJWT tokens, email-validator address validation, and python-multipart login forms. Tested with Python 3.14. Python dependency ranges are not a full lockfile. React/Vite and frontend test tools are pinned in `frontend/package.json` and resolved by `frontend/package-lock.json`. Use `npm ci` to reproduce the frontend installation.
 
 ## Security and publication
 
@@ -103,3 +120,12 @@ Before public hosting, add HTTPS, rate limiting, email verification/recovery, se
 ## Development workflow
 
 Commit and push completed, verified app changes to GitHub. Keep changes that still require a database rollout or permission approval on a feature branch until that approval and verification are complete. Run the tests, inspect the staged diff, and run `backend/.venv/bin/python scripts/check_public_files.py` before each publication. Never commit real environment settings, local backups, database files or runtime data. See [TESTING.md](TESTING.md) for manual team-permission checks after installation.
+
+
+## Frontend development
+
+React components live in `frontend/src/components`, session state in `frontend/src/App.jsx`, and the API helper in `frontend/src/api.js`. The light green stylesheet lives in `frontend/src/styles.css`. There is no parallel legacy DOM implementation. Tokens stay in React memory, not browser storage. The backend continues to enforce all permissions. Stale requests cannot repopulate a signed-out workspace, and server failures keep editable form input intact.
+
+For optional hot reload, keep FastAPI running and run `npm run dev` from `frontend`. Vite binds to loopback and proxies API calls to port 8000. Use the development address printed in the terminal, commonly port 5173. For everyday use, rebuild after frontend source changes and keep using port 8000. Build before restarting FastAPI on a fresh checkout. Generated `dist` and `node_modules` are ignored; source and lockfiles are committed. Never put secrets into frontend environment variables or bundles. No frontend `.env` is required. Production build source maps are disabled.
+
+The build setup follows the official [React client app guidance](https://react.dev/learn/build-a-react-app-from-scratch) and [Vite documentation](https://vite.dev/guide/).
