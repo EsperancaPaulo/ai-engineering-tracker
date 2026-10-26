@@ -20,3 +20,28 @@ it('does not import automatically when the repository has no open issues',async(
  await actor.type(screen.getByLabelText('Public repository'),'demo/repo');await actor.click(screen.getByRole('button',{name:'Preview issues'}));await screen.findByText('No open issues on this page. Pull requests are excluded.');
  expect(api).toHaveBeenCalledOnce();expect(screen.getByRole('button',{name:'Import 0 selected issues'}).disabled).toBe(true);
 });
+it('generates only on request and requires separate approval before applying AI drafts',async()=>{
+ const actor=userEvent.setup(),close=vi.fn();
+ const issue={id:1,number:3,title:'Broken export',body:'Export fails for large files.',url:'https://github.com/demo/repo/issues/3',already_imported:false};
+ const suggestion={summary:'Large exports fail.','priority':'high','rationale':'Reported export failure.','source_quote':'Export fails','model':'fixture'};
+ const api=vi.fn(async path=>path.endsWith('/preview')?{page:1,has_next:false,preview_token:'original',ai:{ready:true},issues:[issue]}:path.endsWith('/analyze')?{preview_token:'reviewed',issues:[{...issue,ai_suggestion:suggestion}]}:{imported_count:1,skipped_issue_numbers:[]});
+ render(<GitHubImportDialog project={project} api={api} onClose={close} onSaved={vi.fn()}/>);
+ await actor.type(screen.getByLabelText('Public repository'),'demo/repo');await actor.click(screen.getByRole('button',{name:'Preview issues'}));
+ const selected=await screen.findByRole('checkbox',{name:'#3 Broken export'});expect(api).toHaveBeenCalledOnce();
+ await actor.click(selected);await actor.click(screen.getByRole('button',{name:'Send to OpenAI & draft suggestions'}));
+ const approval=await screen.findByRole('checkbox',{name:'Approve AI summary and high priority for #3'});
+ expect(approval.checked).toBe(false);expect(close).not.toHaveBeenCalled();expect(api).toHaveBeenCalledTimes(2);
+ expect(JSON.parse(api.mock.calls[1][1].body)).toEqual({preview_token:'original',issue_numbers:[3],consent:true});
+ await actor.click(approval);await actor.click(selected);expect(approval.checked).toBe(false);expect(approval.disabled).toBe(true);
+ await actor.click(selected);await actor.click(approval);await actor.click(screen.getByRole('button',{name:'Import 1 selected issue'}));
+ await waitFor(()=>expect(close).toHaveBeenCalledOnce());
+ expect(JSON.parse(api.mock.calls[2][1].body)).toEqual({preview_token:'reviewed',issue_numbers:[3],accepted_ai_numbers:[3]});
+});
+it('keeps original import available after AI generation fails',async()=>{
+ const actor=userEvent.setup();
+ const api=vi.fn(async path=>{if(path.endsWith('/analyze'))throw new Error('AI is unavailable');return {page:1,has_next:false,preview_token:'original',ai:{ready:true},issues:[{id:1,number:3,title:'Issue',body:'Details',url:'https://github.com/demo/repo/issues/3'}]};});
+ render(<GitHubImportDialog project={project} api={api} onClose={vi.fn()} onSaved={vi.fn()}/>);
+ await actor.type(screen.getByLabelText('Public repository'),'demo/repo');await actor.click(screen.getByRole('button',{name:'Preview issues'}));
+ await actor.click(await screen.findByRole('checkbox',{name:'#3 Issue'}));await actor.click(screen.getByRole('button',{name:'Send to OpenAI & draft suggestions'}));
+ expect((await screen.findByRole('alert')).textContent).toBe('AI is unavailable');expect(screen.getByRole('button',{name:'Import 1 selected issue'}).disabled).toBe(false);
+});

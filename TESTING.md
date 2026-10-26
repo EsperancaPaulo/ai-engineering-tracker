@@ -65,4 +65,16 @@ The automated suites cover missing configuration, invalid/expired/wrong-action/w
 4. Preview again: the same issue must show as already imported. Editors and Viewers should not see import controls; the API also enforces this restriction.
 5. Invalid repository input, unavailable repositories and expired previews should show useful errors without creating tasks.
 
-Current automated verification: 29 frontend tests and 90 backend tests.
+Current automated verification: 31 frontend tests and 110 backend tests.
+
+## AI review checks (after private API setup)
+
+1. Sign in as Owner and preview a public repository with open issues. Select one issue.
+2. Read the data-sharing notice, then choose Send to OpenAI & draft suggestions. This is a billed API request. No task should appear yet.
+3. Compare the draft with Original issue details and the source link. The quoted evidence must be present in the source. Approval must start unchecked.
+4. Import without approving AI: original text and Medium priority should be retained. Use a different disposable issue to test approving the AI summary/priority before final import.
+5. Confirm the approved task keeps the original text and link, and Recent activity records the review decision. Preview it again and confirm duplicate import is blocked.
+6. Try the flow as Editor/Viewer: import/AI controls must not be available.
+7. With AI disabled or unavailable, original imports must continue; no fake AI draft should be displayed.
+
+Automated checks use mocked provider responses and cover owner-only access, project-bound/expired/tampered previews, explicit consent, no saving during generation, approval/default-original behavior, duplicate prevention, safe failures, local request limits, strict output validation and exact source quotes. Live AI quality and billed API access remain a separate manual check.
