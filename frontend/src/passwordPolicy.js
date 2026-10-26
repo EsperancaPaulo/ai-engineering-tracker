@@ -2,13 +2,18 @@ import policy from '../../shared/password-policy.json';
 export {policy};
 export function assessPassword(password,name,email,estimator) {
   const length=Array.from(password).length;
-  if(!length)return {valid:false,score:0,message:'Use a long, original passphrase.'};
-  if(length<policy.minimum_length||length>policy.maximum_length)return {valid:false,score:0,message:'Use between 15 and 128 characters.'};
   const normalized=password.normalize('NFKC').toLowerCase(),letters=normalized.replace(/[^\p{L}]/gu,'');
-  const roots=[...policy.common_roots,name.replaceAll(' ','').toLowerCase(),email.split('@')[0].toLowerCase()];
-  if(roots.some(root=>root&&letters&&letters.split(root).join('')===''))return {valid:false,score:0,message:'Avoid common passwords and simple versions of your name or email.'};
-  if(policy.common_phrases.includes(normalized.replace(/[^\p{L}\p{N}]/gu,'')))return {valid:false,score:0,message:'Choose an original passphrase rather than a well-known example.'};
-  if(!estimator)return {valid:false,score:0,message:'Loading the local password check…'};
-  const result=estimator(password,[name,email,email.split('@')[0]]);
-  return {valid:result.score>=policy.minimum_score,score:result.score,message:result.score>=policy.minimum_score?'Good length and resistance to common guessing patterns.':'Try a longer, less predictable passphrase.'};
+  const repeatsRoot=root=>Boolean(root&&letters&&letters.split(root).join('')==='');
+  const common=policy.common_roots.some(repeatsRoot)||policy.common_phrases.includes(normalized.replace(/[^\p{L}\p{N}]/gu,''));
+  const personal=[name.replaceAll(' ','').toLowerCase(),email.split('@')[0].toLowerCase()].some(repeatsRoot);
+  const withinLength=length>=policy.minimum_length&&length<=policy.maximum_length;
+  const result=estimator&&length&&length<=policy.maximum_length?estimator(password,[name,email,email.split('@')[0]]):null;
+  const checks=[
+    {id:'length',label:`${policy.minimum_length}–${policy.maximum_length} characters`,passed:withinLength},
+    {id:'common',label:'Not a common password or known example',passed:Boolean(length)&&!common},
+    {id:'personal',label:'Not a simple version of your name or email',passed:Boolean(length)&&!personal},
+    {id:'guessing',label:'Passes the strength check',passed:Boolean(result&&result.score>=policy.minimum_score)},
+  ];
+  const valid=checks.every(check=>check.passed),score=result?.score??0;
+  return {valid,score,checks,label:!length?'Not checked':!estimator?'Checking…':valid?'Strong':score>=2&&withinLength&&!common&&!personal?'Fair':'Weak'};
 }

@@ -97,3 +97,19 @@ it('rolls back a failed task status change and shows the reason',async()=>{
  expect(screen.getByLabelText('Status for Original task').value).toBe('done');
  expect(JSON.parse(api.mock.calls.find(([,options])=>options?.method==='PATCH')[1].body)).toEqual({status:'in_progress'});
 });
+it('shows live password requirements and refuses submission until every check passes',async()=>{
+ const actor=userEvent.setup(),fetch=appFetch(),signedIn=vi.fn();vi.stubGlobal('fetch',fetch);render(<Auth onSignIn={signedIn}/>);
+ await actor.click(screen.getByRole('button',{name:'Create account',exact:true}));
+ expect(screen.queryByText(/Use a long, original passphrase/)).toBe(null);
+ await actor.type(screen.getByLabelText('Your name'),'Test Owner');await actor.type(screen.getByLabelText('Email address'),'test@example.com');
+ const password=screen.getByLabelText('Password'),confirm=screen.getByLabelText('Confirm password'),submit=within(document.querySelector('#auth-form')).getByRole('button',{name:'Create account',exact:true});
+ fireEvent.change(password,{target:{value:'Password123456789!'}});fireEvent.change(confirm,{target:{value:'Password123456789!'}});
+ expect(screen.getByRole('list',{name:'Password requirements'}).textContent).toContain('Not a common password or known example: not passed');expect(submit.disabled).toBe(true);
+ fireEvent.submit(document.querySelector('#auth-form'));expect(fetch.mock.calls.some(([path])=>path==='/auth/register')).toBe(false);
+ fireEvent.change(password,{target:{value:'cobalt lanterns drift beyond seven orchards'}});fireEvent.change(confirm,{target:{value:'different'}});
+ await waitFor(()=>expect(screen.getByRole('status').textContent).toContain('Strong'));expect(submit.disabled).toBe(true);
+ fireEvent.change(confirm,{target:{value:'cobalt lanterns drift beyond seven orchards'}});
+ await waitFor(()=>expect(submit.disabled).toBe(false));
+ expect([...document.querySelectorAll('#password-checks li')].every(item=>item.dataset.passed==='true')).toBe(true);
+ fireEvent.change(password,{target:{value:'short'}});expect(submit.disabled).toBe(true);
+});
