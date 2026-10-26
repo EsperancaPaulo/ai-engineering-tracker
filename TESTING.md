@@ -49,8 +49,8 @@ The suite uses separate SQLite databases and test signing secrets. PostgreSQL mi
 ## Password and human-verification checks
 
 1. Hard-refresh the app, sign out, and select Create account.
-2. Try a common password such as `Password123456789!`. The local feedback should reject it. Use a unique long passphrase or password-manager-generated password instead; do not reuse the example.
-3. Confirm the password. A mismatch must prevent submission.
+2. Try a common password such as `Password123456789!`. The checklist should leave the common-password check unmet and account creation blocked. Use a unique long passphrase or password-manager-generated password instead; do not reuse the example.
+3. Confirm the password. Every checklist item must pass; a mismatch must prevent submission. Change a passing password back to a weak one and confirm submission is blocked again.
 4. Complete the real Cloudflare human-verification widget yourself. Account creation must remain blocked without a successful check.
 5. Create a disposable test account, then sign in and confirm its projects start empty. Existing accounts should still sign in normally.
 6. If verification expires or fails, retry it before resubmitting. Do not share passwords, tokens or secret keys.
@@ -65,4 +65,4 @@ The automated suites cover missing configuration, invalid/expired/wrong-action/w
 4. Preview again: the same issue must show as already imported. Editors and Viewers should not see import controls; the API also enforces this restriction.
 5. Invalid repository input, unavailable repositories and expired previews should show useful errors without creating tasks.
 
-Current automated verification: 27 frontend tests and 90 backend tests.
+Current automated verification: 29 frontend tests and 90 backend tests.

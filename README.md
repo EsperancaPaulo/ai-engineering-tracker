@@ -108,7 +108,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The frontend has 27 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 90 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
+The frontend has 29 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 90 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
 
 Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
 
@@ -135,11 +135,11 @@ The build setup follows the official [React client app guidance](https://react.d
 
 ## Passwords and human verification
 
-New registrations require a 15–128-character password. Local zxcvbn dictionary and pattern checks reject common or easily guessed passwords, including account-related words. The browser shows feedback and asks for confirmation. These checks do not use AI or send passwords to an external checking service. Existing passwords and sign-in continue to work. Passwords remain Argon2id-hashed; strength estimation is not a breached-password database check.
+New registrations require a 15–128-character password. Local zxcvbn dictionary and pattern checks reject common or easily guessed passwords, including account-related words. The browser shows a live strength rating and requirement checklist, including confirmation. Every requirement must pass before registration can be submitted; the backend independently enforces password strength. These checks do not use AI or send passwords to an external checking service. Existing passwords and sign-in continue to work. Passwords remain Argon2id-hashed; strength estimation is not a breached-password database check.
 
 Create a Managed widget in Cloudflare Turnstile. Add `localhost` and `127.0.0.1` as separate hostnames without protocols or ports, and disable pre-clearance. Save `TURNSTILE_MODE=required`, the real `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, and `TURNSTILE_ALLOWED_HOSTNAMES=localhost,127.0.0.1` in the existing private backend `.env`, preserving other settings. Restart the backend after editing environment settings. The public site key is sent to the browser; the secret stays server-side. No frontend environment file is needed.
 
-Registration fails closed when configuration is missing or verification is unavailable. The server verifies each token directly with Cloudflare and checks its registration action, allowed hostname and five-minute validity. Tokens are single use. Cloudflare handles browser challenge data; passwords are not included in verification requests. Existing sign-in does not require Turnstile. Explicit `test` mode is for development only and is labelled in the UI; official dummy keys are rejected in required mode.
+Registration fails closed when configuration is missing or verification is unavailable. The server verifies each token directly with Cloudflare and checks its registration action, allowed hostname and five-minute validity. Tokens are single use. Managed mode may verify a browser automatically; Cloudflare chooses whether an interactive checkbox is necessary. Cloudflare handles browser challenge data; passwords are not included in verification requests. Existing sign-in does not require Turnstile. Explicit `test` mode is for development only and is labelled in the UI; official dummy keys are rejected in required mode.
 
 ## Public GitHub issue import
 

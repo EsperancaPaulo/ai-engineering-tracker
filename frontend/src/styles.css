@@ -69,3 +69,5 @@ select:disabled{opacity:.7;cursor:default}
 /* Allow verification and long feedback to fit within the two-column account view. */
 .auth-layout{grid-template-columns:repeat(2,minmax(0,1fr))}.auth-panel,.auth-card{min-width:0}.human-check{max-width:100%}
 @media(max-width:760px){.auth-layout{grid-template-columns:minmax(0,1fr)}}
+
+.password-rating{font-size:11px;color:var(--muted);margin-top:8px}.password-rating strong{color:var(--ink)}.password-checklist{list-style:none;padding:0;margin:16px 0 22px;display:grid;gap:8px;font-size:11px;color:var(--muted)}.password-checklist li{display:flex;gap:9px;align-items:baseline;line-height:1.5}.password-checklist li>span:first-child{width:14px;flex-shrink:0;font-weight:700}.password-checklist li[data-passed="true"]{color:var(--green)}

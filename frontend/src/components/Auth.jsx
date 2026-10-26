@@ -20,6 +20,7 @@ export default function Auth({onSignIn, notice = ''}) {
     return ()=>{active=false;};
   },[registering,configRetry]);
   const strength=useMemo(()=>assessPassword(password,name,email,estimator),[password,name,email,estimator]);
+  const passwordChecks=[...strength.checks,{id:'confirmation',label:'Passwords match',passed:Boolean(password)&&confirmation===password}];
   const human=configuration?.human_verification;
   const ready=!registering||(strength.valid&&confirmation===password&&human?.ready&&Boolean(humanToken));
   async function submit(event) {
@@ -42,12 +43,12 @@ export default function Auth({onSignIn, notice = ''}) {
       <form id="auth-form" onSubmit={submit}>
         {registering && <><label htmlFor="name">Your name</label><input id="name" name="name" value={name} onChange={e=>setName(e.target.value)} autoComplete="name" maxLength={100} required disabled={busy}/></>}
         <label htmlFor="email">Email address</label><input id="email" name="email" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" placeholder="you@example.com" maxLength={255} required disabled={busy}/>
-        <label htmlFor="password">Password</label><input id="password" name="password" type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete={registering ? 'new-password' : 'current-password'} minLength={registering ? 15 : 1} maxLength={128} required disabled={busy}/>
+        <label htmlFor="password">Password</label><input aria-describedby={registering?'password-checks':undefined} id="password" name="password" type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete={registering ? 'new-password' : 'current-password'} minLength={registering ? 15 : 1} maxLength={128} required disabled={busy}/>
         {registering && <>
           <div className="password-meter" role="meter" aria-label="Password strength" aria-valuemin={0} aria-valuemax={4} aria-valuenow={strength.score}><span style={{width:`${strength.valid?100:strength.score*20}%`}}/></div>
-          <p className="field-hint" aria-live="polite">{strength.message} Password checks run locally without AI.</p>
+          <p className="password-rating" role="status">Strength: <strong>{strength.label}</strong></p>
           <label htmlFor="confirm-password">Confirm password</label><input id="confirm-password" type="password" value={confirmation} onChange={e=>setConfirmation(e.target.value)} maxLength={128} autoComplete="new-password" required disabled={busy}/>
-          {confirmation&&confirmation!==password&&<p className="field-hint">Passwords do not match yet.</p>}
+          <ul id="password-checks" className="password-checklist" aria-label="Password requirements">{passwordChecks.map(check=><li key={check.id} data-passed={check.passed}><span aria-hidden="true">{check.passed?'✓':'○'}</span><span>{check.label}<span className="sr-only">: {check.passed?'passed':'not passed'}</span></span></li>)}</ul>
           {configError&&<><ErrorMessage message={configError}/><button type="button" className="secondary" onClick={()=>setConfigRetry(value=>value+1)}>Retry setup check</button></>}
           {!configuration&&!configError&&<p role="status" className="field-hint">Loading registration protection…</p>}
           {human&&!human.ready&&<p className="field-hint" role="status">Registration is waiting for human-verification setup. Existing accounts can still sign in.</p>}
