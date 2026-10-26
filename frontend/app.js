@@ -1,12 +1,14 @@
 'use strict';
 const $ = id => document.getElementById(id);
-let token = null, user = null, projects = [], tasks = [], activity = [];
+let token = null, user = null, projects = [], tasks = [], activity = [], teamTasks = [];
 let authMode = 'login', currentView = 'overview', createMode = 'project', editingId = null, pendingDelete = null, expiryTimer, toastTimer;
+let activeTeamProject = null;
+const roleLabels = {owner:'Owner',editor:'Editor',viewer:'View only'};
 const statusLabels = {todo: 'To do', in_progress: 'In progress', done: 'Done'};
 function el(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
 function errorAt(id, message) { $(id).textContent = message; $(id).hidden = !message; }
 function notify(message) { $('toast').textContent = message; $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 4000); }
-function signOut(message = '') { clearTimeout(expiryTimer); token = null; user = null; projects = []; tasks = []; activity = []; $('create-dialog').close(); $('delete-dialog').close(); pendingDelete = null; $('app-view').hidden = true; $('auth-view').hidden = false; $('auth-form').reset(); setAuthMode('login'); errorAt('auth-error', message); $('email').focus(); }
+function signOut(message = '') { clearTimeout(expiryTimer); token = null; user = null; projects = []; tasks = []; teamTasks = []; activity = []; $('create-dialog').close(); $('delete-dialog').close(); $('team-dialog').close(); activeTeamProject = null; pendingDelete = null; $('app-view').hidden = true; $('auth-view').hidden = false; $('auth-form').reset(); $('member-form').reset(); $('projects-list').replaceChildren(); $('tasks-list').replaceChildren(); $('activity-list').replaceChildren(); setAuthMode('login'); errorAt('auth-error', message); $('email').focus(); }
 async function api(path, options = {}) {
   const response = await fetch(path, {...options, headers: {...(token ? {Authorization: `Bearer ${token}`} : {}), ...options.headers}, cache: 'no-store'});
   const data = await response.json().catch(() => ({}));
@@ -45,6 +47,8 @@ $('auth-form').onsubmit = async event => {
     $('auth-form').reset();
     $('profile-name').textContent = user.name; $('avatar').textContent = user.name.slice(0,1).toUpperCase();
     $('greeting').textContent = `Good to see you, ${user.name.split(' ')[0]}.`;
+    projects = []; tasks = []; teamTasks = []; activity = [];
+    $('task-scope').value = 'mine'; $('task-search').value = ''; $('status-filter').value = 'all'; render();
     $('auth-view').hidden = true; $('app-view').hidden = false;
     setView('overview');
     await refresh();
@@ -56,7 +60,7 @@ $('today').textContent = new Intl.DateTimeFormat(undefined, {weekday:'long', mon
 function setView(view) {
   currentView = view;
   document.querySelectorAll('.nav-item').forEach(button => {button.classList.toggle('active', button.dataset.view === view); if(button.dataset.view === view) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');});
-  const titles = {overview:['Your next chapter.', 'A little more focused. A little further forward.'], projects:['Ideas into action.', 'Shared projects. Personal momentum.'], tasks:['Make your next move.', 'One focused task at a time.'], activity:['Look how far you’ve come.', 'A record of the work that moves you forward.']};
+  const titles = {overview:['Your next chapter.', 'A little more focused. A little further forward.'], projects:['Ideas into action.', 'Your projects. Your team. Your momentum.'], tasks:['Make your next move.', 'One focused task at a time.'], activity:['Look how far you’ve come.', 'A record of the work that moves you forward.']};
   $('page-title').textContent = titles[view][0]; $('page-description').textContent = titles[view][1];
   $('breadcrumb').textContent = `Workspace / ${view === 'tasks' ? 'My tasks' : view[0].toUpperCase()+view.slice(1)}`;
   for (const section of ['overview','projects','tasks','activity']) $(`${section}-section`).hidden = view !== 'overview' && view !== section;
@@ -65,7 +69,8 @@ document.querySelectorAll('[data-view]').forEach(button => button.onclick = () =
 $('focus-tasks').onclick = () => setView('tasks');
 async function refresh() {
   errorAt('app-error', '');
-  try { [projects, tasks, activity] = await Promise.all([api('/api/projects'),api('/api/tasks'),api('/api/activity')]); render(); }
+  const sessionToken = token;
+  try { const result = await Promise.all([api('/api/projects'),api('/api/tasks'),api('/api/activity'),api('/api/tasks?scope=team')]); if (token !== sessionToken) return; [projects, tasks, activity, teamTasks] = result; render(); }
   catch (error) { if (token) errorAt('app-error', error.message || 'Unable to connect. Please try again.'); }
 }
 function empty(container, heading, description) { const node = el('div','empty-state'); node.append(el('strong','',heading), el('p','',description)); container.append(node); }
@@ -78,7 +83,7 @@ function render() {
   if (!projects.length) empty(list, 'A blank canvas. A good place to start.', 'Create your first project, then break it into small, achievable tasks.');
   projects.forEach(project => {
     const card = el('article','project-card'), top = el('div','project-card-top');
-    top.append(el('span','project-icon','⌘'),el('span','tag','Shared project'));
+    top.append(el('span','project-icon','⌘'),el('span','tag',roleLabels[project.role]));
     card.append(top,el('h3','',project.name),el('p','',project.description || 'Your next great idea starts here.'));
     const personal = tasks.filter(t => t.project_id === project.id), complete = personal.filter(t => t.status === 'done').length;
     const progress = el('div','project-progress'), count = el('div','project-count');
@@ -88,7 +93,10 @@ function render() {
     const actions = el('div', 'item-actions');
     const edit = actionButton('Edit', `Edit project ${project.name}`, () => openEdit('project', project));
     const remove = actionButton('Delete', `Delete project ${project.name}`, () => openDelete('project', project));
-    actions.append(edit, remove);
+    if (project.role !== 'viewer') actions.append(edit);
+    if (project.role === 'owner') actions.append(remove);
+    actions.append(actionButton('Team', `View team for ${project.name}`, () => openTeam(project)));
+    button.hidden = project.role === 'viewer';
     progress.append(count,track,button,actions); card.append(progress); list.append(card);
   });
   renderTasks();
@@ -103,13 +111,15 @@ function render() {
 function renderTasks() {
   const list = $('tasks-list'); list.replaceChildren();
   const query = $('task-search').value.toLowerCase(), filter = $('status-filter').value;
-  const visible = tasks.filter(t => t.title.toLowerCase().includes(query) && (filter === 'all' || t.status === filter));
-  if (!visible.length) empty(list,tasks.length ? 'No matching tasks.' : 'Make space for your first small win.',tasks.length ? 'Try another search or status.' : 'Add a task to a project and take the next step.');
+  const source = $('task-scope').value === 'team' ? teamTasks : tasks;
+  const visible = source.filter(t => t.title.toLowerCase().includes(query) && (filter === 'all' || t.status === filter));
+  if (!visible.length) empty(list,source.length ? 'No matching tasks.' : 'Make space for your first small win.',source.length ? 'Try another search or status.' : 'Add a task to a project and take the next step.');
   visible.forEach(task => {
     const row = el('article','task-row'), title = el('div','task-title',task.title);
-    title.append(el('small','',projects.find(p => p.id === task.project_id)?.name || 'Project'));
+    title.append(el('small','',`${projects.find(p => p.id === task.project_id)?.name || 'Project'} · ${task.assignee_name || 'Unassigned'}`));
+    if (task.description) title.append(el('p','task-description',task.description));
     const select = el('select'); select.setAttribute('aria-label',`Status for ${task.title}`);
-    Object.entries(statusLabels).forEach(([value,label]) => { const option = el('option','',label); option.value = value; select.append(option); }); select.value = task.status;
+    Object.entries(statusLabels).forEach(([value,label]) => { const option = el('option','',label); option.value = value; select.append(option); }); select.value = task.status; select.disabled = !task.can_edit;
     select.onchange = async () => {
       select.disabled = true;
       try { await api(`/api/tasks/${task.id}`,jsonOptions({status:select.value},'PATCH')); await refresh(); notify('Task updated. Keep moving forward.'); }
@@ -117,24 +127,27 @@ function renderTasks() {
       finally {select.disabled = false;}
     };
     const controls = el('div','task-controls'), actions = el('div','item-actions');
-    actions.append(actionButton('Edit', `Edit task ${task.title}`, () => openEdit('task',task)), actionButton('Delete', `Delete task ${task.title}`, () => openDelete('task',task)));
+    if (task.can_edit) actions.append(actionButton('Edit', `Edit task ${task.title}`, () => openEdit('task',task)), actionButton('Delete', `Delete task ${task.title}`, () => openDelete('task',task)));
     controls.append(select,actions);
     row.append(title,el('span',`priority ${task.priority}`,task.priority),controls); list.append(row);
   });
 }
 $('task-search').oninput = renderTasks; $('status-filter').onchange = renderTasks;
-function openCreate(mode, projectId) {
+async function openCreate(mode, projectId) {
   if (mode === 'task' && !projects.length) { notify('Create a project first, then add your tasks.'); openCreate('project'); return; }
+  const writable = projects.filter(project => project.role !== 'viewer');
+  if (mode === 'task' && !writable.length) {notify('You need owner or editor access to add tasks.'); return;}
   editingId = null; createMode = mode; const isProject = mode === 'project';
   $('create-form').reset(); errorAt('dialog-error','');
   $('dialog-title').textContent = isProject ? 'Give your idea a home.' : 'One small step forward.';
-  $('dialog-hint').textContent = isProject ? 'Projects are shared with everyone in this workspace.' : 'This task will be assigned to you.';
+  $('dialog-hint').textContent = isProject ? 'Only you can see this project until you add team members.' : 'Choose a project and the person responsible for this task.';
   $('item-name-label').textContent = isProject ? 'Project name' : 'Task title'; $('item-name').maxLength = isProject ? 150 : 200;
   $('project-fields').hidden = !isProject; $('task-fields').hidden = isProject; $('task-project').required = !isProject;
   $('create-submit').textContent = isProject ? 'Create project ↗' : 'Add task ↗';
-  $('task-project').replaceChildren(); projects.forEach(project => {const option = el('option','',project.name); option.value = project.id; $('task-project').append(option);});
+  $('task-project').replaceChildren(); writable.forEach(project => {const option = el('option','',project.name); option.value = project.id; $('task-project').append(option);});
   if (projectId) $('task-project').value = projectId;
   $('create-dialog').showModal(); $('item-name').focus();
+  if (!isProject) await loadAssignees(user.id);
 }
 $('new-project').onclick = () => openCreate('project'); $('new-task').onclick = () => openCreate('task'); $('close-dialog').onclick = () => $('create-dialog').close();
 $('create-form').onsubmit = async event => {
@@ -143,7 +156,7 @@ $('create-form').onsubmit = async event => {
     const isProject = createMode === 'project';
     const path = (isProject ? '/api/projects' : '/api/tasks') + (editingId === null ? '' : `/${editingId}`);
     const wasEditing = editingId !== null;
-    await api(path,jsonOptions(isProject ? {name:$('item-name').value.trim(),description:$('description').value.trim()} : {title:$('item-name').value.trim(),project_id:Number($('task-project').value),priority:$('task-priority').value}, wasEditing ? (isProject ? 'PUT' : 'PATCH') : 'POST'));
+    await api(path,jsonOptions(isProject ? {name:$('item-name').value.trim(),description:$('description').value.trim()} : {title:$('item-name').value.trim(),project_id:Number($('task-project').value),priority:$('task-priority').value,description:$('task-description').value.trim(),...($('task-assignee').value ? {assigned_to:Number($('task-assignee').value)} : {})}, wasEditing ? (isProject ? 'PUT' : 'PATCH') : 'POST'));
     $('create-dialog').close(); await refresh(); notify(wasEditing ? 'Changes saved.' : (isProject ? 'Project created. Let’s build something.' : 'Task added. You’ve got this.'));
   } catch(error) {errorAt('dialog-error',error.message || 'Unable to connect. Please try again.');}
   finally {$('create-submit').disabled = false;}
@@ -160,25 +173,25 @@ function activitySummary(details) {
   try { const parsed = JSON.parse(details); return typeof parsed.summary === 'string' ? parsed.summary : details; }
   catch { return details; }
 }
-function openEdit(mode, item) {
-  openCreate(mode, mode === 'task' ? item.project_id : undefined);
+async function openEdit(mode, item) {
+  await openCreate(mode, mode === 'task' ? item.project_id : undefined);
   editingId = item.id;
   $('dialog-title').textContent = mode === 'project' ? 'Edit project' : 'Edit task';
-  $('dialog-hint').textContent = mode === 'project' ? 'These changes will be visible to everyone in this workspace.' : 'Update your task details. Your current status will stay the same.';
+  $('dialog-hint').textContent = mode === 'project' ? 'These changes will be visible to members of this project.' : 'Update your task details. Your current status will stay the same.';
   $('item-name').value = mode === 'project' ? item.name : item.title;
   if (mode === 'project') $('description').value = item.description || '';
-  else $('task-priority').value = item.priority;
+  else { $('task-priority').value = item.priority; $('task-description').value = item.description || ''; await loadAssignees(item.assigned_to); }
   $('create-submit').textContent = 'Save changes';
 }
 function openDelete(mode, item) {
   pendingDelete = {mode, id:item.id};
-  $('delete-title').textContent = mode === 'project' ? 'Delete shared project?' : 'Delete task?';
+  $('delete-title').textContent = mode === 'project' ? 'Delete project?' : 'Delete task?';
   $('delete-name').textContent = mode === 'project' ? item.name : item.title;
-  $('delete-description').textContent = mode === 'project' ? 'This removes the project for everyone. Projects with any remaining tasks cannot be deleted. This action cannot be undone.' : 'This permanently removes your task and updates your progress. This action cannot be undone.';
+  $('delete-description').textContent = mode === 'project' ? 'This removes the project for its members. Projects with any remaining tasks cannot be deleted. This action cannot be undone.' : 'This permanently removes this task and updates project progress. This action cannot be undone.';
   errorAt('delete-error',''); $('delete-submit').disabled = false;
   $('delete-dialog').showModal(); $('delete-cancel').focus();
 }
-function closeDelete() { $('delete-dialog').close(); pendingDelete = null; }
+function closeDelete() { $('delete-dialog').close(); $('team-dialog').close(); activeTeamProject = null; pendingDelete = null; }
 $('delete-cancel').onclick = closeDelete;
 $('delete-close').onclick = closeDelete;
 $('delete-dialog').addEventListener('cancel', () => pendingDelete = null);
@@ -197,4 +210,65 @@ $('toggle-motion').onclick = () => {
   const paused = document.querySelector('.welcome-banner').classList.toggle('motion-paused');
   $('toggle-motion').setAttribute('aria-pressed', String(paused));
   $('toggle-motion').textContent = paused ? 'Resume animation' : 'Pause animation';
+};
+
+$('task-scope').onchange = renderTasks;
+async function loadAssignees(preferredId) {
+  const project = projects.find(p => p.id === Number($('task-project').value));
+  if (!project) return;
+  $('create-submit').disabled = true;
+  try {
+    const members = await api(`/api/projects/${project.id}/members`);
+    if (Number($('task-project').value) !== project.id) return;
+    const candidates = members.filter(member => member.role !== 'viewer' && (project.role === 'owner' || member.user_id === user.id));
+    $('task-assignee').replaceChildren();
+    if (preferredId === null) {const option = el('option','','Unassigned (keep existing)'); option.value = ''; $('task-assignee').append(option);}
+    candidates.forEach(member => {const option = el('option','',member.name + (member.user_id === user.id ? ' (you)' : '')); option.value = member.user_id; $('task-assignee').append(option);});
+    const preferred = preferredId === null ? '' : String(preferredId ?? user.id);
+    if ([...$('task-assignee').options].some(option => option.value === preferred)) $('task-assignee').value = preferred;
+    $('task-assignee').disabled = project.role !== 'owner';
+    $('assignment-hint').textContent = project.role === 'owner' ? 'Owners can assign work to project owners or editors.' : 'Only the project owner can assign work to another member.';
+  } catch(error) {errorAt('dialog-error',error.message);}
+  finally {$('create-submit').disabled = false;}
+}
+$('task-project').onchange = () => loadAssignees(Number($('task-assignee').value) || user.id);
+async function openTeam(project) {
+  activeTeamProject = project;
+  $('team-project').textContent = project.name;
+  $('member-form').hidden = project.role !== 'owner';
+  $('member-form').reset(); errorAt('team-error','');
+  $('team-members').replaceChildren(el('p','subtle','Loading members…'));
+  $('team-dialog').showModal();
+  await renderMembers();
+}
+async function renderMembers() {
+  const project = activeTeamProject; if (!project) return;
+  try {
+    const members = await api(`/api/projects/${project.id}/members`);
+    if (activeTeamProject?.id !== project.id) return;
+    const list = $('team-members'); list.replaceChildren();
+    members.forEach(member => {
+      const row = el('div','member-row'); row.append(el('strong','',member.name + (member.user_id === user.id ? ' (you)' : '')));
+      if (project.role === 'owner' && member.role !== 'owner') {
+        const role = el('select'); role.setAttribute('aria-label',`Role for ${member.name}`);
+        ['editor','viewer'].forEach(value => {const option = el('option','',roleLabels[value]); option.value = value; role.append(option);}); role.value = member.role;
+        role.onchange = async () => {role.disabled = true; errorAt('team-error',''); try {await api(`/api/projects/${project.id}/members/${member.user_id}`,jsonOptions({role:role.value},'PUT')); await renderMembers(); await refresh(); notify('Project role updated.');} catch(error) {role.value = member.role; errorAt('team-error',error.message);} finally {role.disabled=false;}};
+        row.append(role,actionButton('Remove',`Remove ${member.name} from project`,async () => {
+          if (!confirm(`Remove ${member.name} from this project? Their access will end immediately. You can add them again later.`)) return;
+          errorAt('team-error','');
+          try {await api(`/api/projects/${project.id}/members/${member.user_id}`,{method:'DELETE'}); await renderMembers(); await refresh(); notify('Member removed.');} catch(error) {errorAt('team-error',error.message);}
+        }));
+      } else row.append(el('span','tag',roleLabels[member.role]));
+      list.append(row);
+    });
+  } catch(error) {errorAt('team-error',error.message);}
+}
+$('team-close').onclick = () => {$('team-dialog').close(); activeTeamProject = null;};
+$('team-dialog').addEventListener('cancel', () => activeTeamProject = null);
+$('member-form').onsubmit = async event => {
+  event.preventDefault(); if (!activeTeamProject) return;
+  $('member-submit').disabled = true; errorAt('team-error','');
+  try {await api(`/api/projects/${activeTeamProject.id}/members`,jsonOptions({email:$('member-email').value.trim(),role:$('member-role').value})); $('member-form').reset(); await renderMembers(); await refresh(); notify('Member added to project.');}
+  catch(error) {errorAt('team-error',error.message || 'Unable to connect. Please try again.');}
+  finally {$('member-submit').disabled=false;}
 };

@@ -47,3 +47,13 @@
 .motion-paused .orbit,.motion-paused .orbit-dot{animation-play-state:paused}
 @media(max-width:760px){.motion-control{display:none}}
 @media(prefers-reduced-motion:reduce){.orbit,.orbit-dot{animation:none;will-change:auto}.motion-control{display:none}}
+
+.task-toolbar{flex-wrap:wrap}.task-toolbar>select{width:auto;min-width:125px}
+.task-toolbar .search-box{flex:1;max-width:none;min-width:140px}
+.task-description{font-size:10px;font-weight:400;color:#6e8066;line-height:1.7;margin-top:7px;white-space:pre-wrap;overflow-wrap:anywhere}
+.team-members{margin:20px 0}.member-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.member-row strong{font-size:12px;flex:1;overflow-wrap:anywhere;min-width:0}.member-row select{width:110px;padding:8px;font-size:11px}
+#member-form h3{font-size:16px;margin-top:25px}
+#team-dialog{max-height:85svh;overflow:auto}
+#team-dialog .field-hint{font-size:11px}
+select:disabled{opacity:.7;cursor:default}

@@ -28,10 +28,10 @@ The website currently uses plain HTML/CSS/JavaScript served by FastAPI. React ha
 
 ### 1. Team-ready core
 
-- [ ] Introduce explicit project/team ownership and membership with safe migrations for existing data.
-- [ ] Enforce role-based permissions server-side; add controlled task assignment and a team issue view.
+- [ ] Deploy the prepared project ownership/membership update after approval of the real-database migration.
+- [ ] Deploy the prepared Owner/Editor/Viewer checks, controlled assignments and team task view after the migration.
 - [ ] Migrate the existing interface to React while preserving the accepted design and working API.
-- [ ] Add task descriptions to the UI and issue details appropriate to the team workflow.
+- [ ] Deploy the prepared task-description UI; extend issue details with the later GitHub/import workflow.
 - [ ] Define backups, restore and retention before relying on this for team operations.
 
 ### 2. Secure connected sources
@@ -65,3 +65,10 @@ The website currently uses plain HTML/CSS/JavaScript served by FastAPI. React ha
 ## Working rules
 
 Preserve existing user records and secrets. Do not publish the local database or credentials. Keep important AI decisions subject to human approval. Do not activate external notifications without the user's authorization. Keep the UI plain and useful. Finish and verify one milestone before describing it as delivered.
+
+
+## Prepared update awaiting deployment approval
+
+The project ownership/membership update is implemented and verified in an isolated test copy. It includes private new projects, project-level Owner/Editor/Viewer permissions, owner-managed registered members and assignments, team task views, descriptions and a versioned additive migration. Automated tests cover role restrictions, nonmember isolation, owner protection, revocation and record-preserving migration. PostgreSQL migration was checked in a temporary rolled-back schema. React, organization-wide administration, ownership transfer and external integrations remain pending.
+
+The real database and currently running application have not been changed for this update. Automatic approval review requires explicit approval to back up the local database and make the sole existing account Owner of the existing project. The private database backup has now been created and archive-verified. Once the ownership change is explicitly authorized, apply the migration, verify original records unchanged, install the app changes, and update this roadmap's delivered status. Do not describe this prepared milestone as live before that process completes.
