@@ -2,7 +2,7 @@
 import json
 import re
 from datetime import datetime,timedelta,timezone
-from typing import Annotated
+from typing import Annotated, Literal
 import httpx
 import jwt
 from fastapi import APIRouter,HTTPException
@@ -11,6 +11,7 @@ from sqlalchemy import select
 from auth import ALGORITHM,ISSUER,SECRET_KEY,Database
 from models import ActivityLog,Task
 from tracker import CurrentUser,project_access,record
+import ai_suggestions
 
 router=APIRouter(prefix='/api/projects',tags=['GitHub imports'])
 PREVIEW_ISSUER=ISSUER+'/github-preview'
@@ -34,6 +35,53 @@ class ImportInput(BaseModel):
     model_config=ConfigDict(extra='forbid')
     preview_token:SecretStr=Field(min_length=1,max_length=250000)
     issue_numbers:list[Annotated[int,Field(gt=0)]]=Field(min_length=1,max_length=10)
+    accepted_ai_numbers:list[Annotated[int,Field(gt=0)]]=Field(default_factory=list,max_length=10)
+
+
+class AnalyzeInput(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    preview_token:SecretStr=Field(min_length=1,max_length=250000)
+    issue_numbers:list[Annotated[int,Field(gt=0)]]=Field(min_length=1,max_length=3)
+    consent:Literal[True]
+
+
+def decode_preview(token,user_id,project_id):
+    try:
+        claims=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM],issuer=PREVIEW_ISSUER,audience=str(project_id),options={'require':['exp','iat','sub','aud','iss']})
+        if claims['sub']!=str(user_id):raise ValueError()
+        return claims
+    except (jwt.InvalidTokenError,ValueError,KeyError,TypeError):
+        raise HTTPException(422,'Preview expired or does not match this request. Preview the repository again.') from None
+
+
+def sign_preview(claims,user_id,project_id):
+    now=datetime.now(timezone.utc)
+    return jwt.encode({**claims,'iss':PREVIEW_ISSUER,'sub':str(user_id),'aud':str(project_id),'iat':now,'exp':now+timedelta(minutes=5)},SECRET_KEY,algorithm=ALGORITHM)
+
+
+@router.get('/{project_id}/github/ai-config')
+def ai_configuration(project_id:int,db:Database,user:CurrentUser):
+    project_access(db,user,project_id,owner_only=True)
+    return ai_suggestions.public_settings()
+
+
+@router.post('/{project_id}/github/analyze')
+def analyze(project_id:int,data:AnalyzeInput,db:Database,user:CurrentUser):
+    project_access(db,user,project_id,owner_only=True)
+    claims=decode_preview(data.preview_token.get_secret_value(),user.id,project_id)
+    issues={issue['number']:issue for issue in claims['issues']}
+    selected=list(dict.fromkeys(data.issue_numbers))
+    if any(number not in issues for number in selected):raise HTTPException(422,'Select issues from this preview.')
+    existing=imported_ids(db,project_id)
+    if any(issues[number]['id'] in existing for number in selected):raise HTTPException(409,'An issue was already imported. Refresh the preview.')
+    # Do not hold a database transaction open during a provider call.
+    user_id=user.id
+    db.rollback()
+    suggestions=ai_suggestions.generate([issues[number] for number in selected],user_id)
+    project_access(db,user,project_id,owner_only=True)
+    updated=[{**issue,**({'ai_suggestion':suggestions[issue['number']]} if issue['number'] in suggestions else {})} for issue in claims['issues']]
+    token=sign_preview({**claims,'issues':updated},user.id,project_id)
+    return {'preview_token':token,'issues':updated}
 
 
 def fetch_issues(repository,page):
@@ -85,18 +133,20 @@ def preview(project_id:int,data:PreviewInput,db:Database,user:CurrentUser):
     token=jwt.encode({'iss':PREVIEW_ISSUER,'sub':str(user.id),'aud':str(project_id),'iat':now,'exp':now+timedelta(minutes=5),
                       'repository':data.repository,'issues':issues},SECRET_KEY,algorithm=ALGORITHM)
     return {'repository':data.repository,'page':data.page,'has_next':next_page,'preview_token':token,
-            'issues':[{**issue,'already_imported':issue['id'] in existing} for issue in issues]}
+            'issues':[{**issue,'already_imported':issue['id'] in existing} for issue in issues],
+            'ai':ai_suggestions.public_settings()}
 
 
 @router.post('/{project_id}/github/import')
 def import_selected(project_id:int,data:ImportInput,db:Database,user:CurrentUser):
     project_access(db,user,project_id,write=True,owner_only=True)
     try:
-        claims=jwt.decode(data.preview_token.get_secret_value(),SECRET_KEY,algorithms=[ALGORITHM],issuer=PREVIEW_ISSUER,audience=str(project_id),options={'require':['exp','iat','sub','aud','iss']})
-        if claims['sub']!=str(user.id):raise ValueError()
+        claims=decode_preview(data.preview_token.get_secret_value(),user.id,project_id)
         issues={issue['number']:issue for issue in claims['issues']}
         selected=list(dict.fromkeys(data.issue_numbers))
         if any(number not in issues for number in selected):raise ValueError()
+        accepted=set(data.accepted_ai_numbers)
+        if not accepted<=set(selected) or any(not issues[number].get('ai_suggestion') for number in accepted):raise ValueError()
     except (jwt.InvalidTokenError,ValueError,KeyError,TypeError):
         raise HTTPException(422,'Preview expired or does not match this import. Preview the repository again.') from None
     existing=imported_ids(db,project_id)
@@ -104,9 +154,15 @@ def import_selected(project_id:int,data:ImportInput,db:Database,user:CurrentUser
     for number in selected:
         issue=issues[number]
         if issue['id'] in existing:skipped.append(number);continue
-        task=Task(title=issue['title'],description=issue['body']+'\n\nSource: '+issue['url'],project_id=project_id,assigned_to=user.id,status='todo',priority='medium')
+        suggestion=issue.get('ai_suggestion')
+        approved=number in accepted
+        description=issue['body']+'\n\nSource: '+issue['url']
+        if approved:description='AI summary (reviewed): '+suggestion['summary']+'\n\nOriginal issue:\n'+description
+        task=Task(title=issue['title'],description=description,project_id=project_id,assigned_to=user.id,status='todo',priority=suggestion['priority'] if approved else 'medium')
         db.add(task);db.flush()
         record(db,user,'GitHub issue imported',json.dumps({'summary':f"#{number}: {issue['title']}",'project_id':project_id,'github_issue_id':issue['id'],'task_id':task.id,'repository':claims['repository'],'issue_number':number,'source_url':issue['url']}))
+        if suggestion:
+            record(db,user,'AI suggestion reviewed',json.dumps({'summary':('Approved' if approved else 'Kept original instead of')+f" AI suggestion for #{number}",'project_id':project_id,'task_id':task.id,'source_url':issue['url'],'approved':approved,'suggestion':suggestion}))
         existing.add(issue['id']);created.append(task.id)
     db.commit()
     return {'created_task_ids':created,'skipped_issue_numbers':skipped,'imported_count':len(created)}

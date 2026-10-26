@@ -87,3 +87,7 @@ Verification: 17 frontend tests and 63 backend tests pass. Browser checks covere
 ## Registration security and public import milestone
 
 New-account passwords are checked locally for length and guessability without AI. Password confirmation and feedback are included; existing credentials are preserved. Real Cloudflare Turnstile is required for new registrations when configured, with server-side token validation and fail-closed setup. Real challenge completion is a manual acceptance check. Owners can review and explicitly import selected open issues from public GitHub repositories; imports preserve source links and skip duplicates. No database migration, private GitHub access, AI processing or notifications are part of this milestone. Automated verification: 27 frontend tests and 90 backend tests.
+
+## Reviewed AI draft implementation — awaiting live API acceptance
+
+The optional owner-only public-issue AI workflow is implemented with structured summaries, explained priority suggestions, exact source quotes, separate per-issue approval and final import confirmation. It preserves originals and records imported review decisions without a database migration. It remains disabled without private OpenAI API configuration; no simulated AI is shown. Automated validation uses mocked provider responses. The AI milestones above remain unchecked until a real configured API request and human acceptance test pass. Durable usage accounting, cancelled-draft history and production spending/rate safeguards remain pending.

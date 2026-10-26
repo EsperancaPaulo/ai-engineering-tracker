@@ -1,6 +1,6 @@
 # AI Engineering Tracker
 
-A local engineering workspace with FastAPI, PostgreSQL, secure sign-in, project teams, tasks, progress and activity history. The interface uses React with Vite, served by FastAPI. Owners can preview and import public GitHub issues. AI assistance, private GitHub connections and Slack remain on the [roadmap](ROADMAP.md).
+A local engineering workspace with FastAPI, PostgreSQL, secure sign-in, project teams, tasks, progress and activity history. The interface uses React with Vite, served by FastAPI. Owners can preview and import public GitHub issues. Optional AI drafts can summarize selected public issues and suggest priorities for owner review. Private GitHub connections and Slack remain on the [roadmap](ROADMAP.md).
 
 ## Setup
 
@@ -108,7 +108,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The frontend has 29 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 90 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
+The frontend has 31 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 110 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
 
 Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
 
@@ -118,7 +118,7 @@ Dependencies are bounded in `requirements.txt`; development tools in `requiremen
 
 Passwords are stored as Argon2id hashes. Profile/validation responses omit submitted passwords and hashes. JWT verification requires the expected issuer, algorithm and expiration. Browser tokens stay in memory; refresh requires sign-in. Sign out clears this browser's token, not a copied token. The orbit animation supports pause and reduced-motion preferences. Optional Google Fonts have local fallbacks.
 
-Before public hosting, add HTTPS, rate limiting, email verification/recovery, session revocation, production secrets and backup/restore procedures. Registration reports duplicate emails. Lists need pagination for large datasets. Project writes serialize with membership changes; broader conflict handling remains future work. No AI or external notifications are active. Read [SECURITY.md](SECURITY.md) and run the staged-file secret check before publishing source. Keep real `.env`, backups, logs, uploads and database files private.
+Before public hosting, add HTTPS, rate limiting, email verification/recovery, session revocation, production secrets and backup/restore procedures. Registration reports duplicate emails. Lists need pagination for large datasets. Project writes serialize with membership changes; broader conflict handling remains future work. AI requests require explicit configuration and an owner action; external notifications remain inactive. Read [SECURITY.md](SECURITY.md) and run the staged-file secret check before publishing source. Keep real `.env`, backups, logs, uploads and database files private.
 
 ## Development workflow
 
@@ -145,4 +145,24 @@ Registration fails closed when configuration is missing or verification is unava
 
 As project Owner, choose **Import issues**, enter `owner/repository`, and preview open issues. Previewing saves nothing. Review details and source links, select up to 10 issues, then confirm import. Imported tasks start as To do with Medium priority and are assigned to you. The original text and source link are retained. Repeated imports of the same issue into that project are skipped. Deleted imported tasks are still recorded as previously imported.
 
-This uses public GitHub data without credentials and never changes GitHub. Pull requests are excluded. Previews expire after five minutes and are bound to the owner and project. Private repositories, OAuth, automatic synchronization and AI summaries are future work. Requests have timeouts, one bounded retry for transient failures, and rate-limit feedback. No schema migration is required for this update; provenance is stored in existing activity records.
+This uses public GitHub data without credentials and never changes GitHub. Pull requests are excluded. Previews expire after five minutes and are bound to the owner and project. Private repositories, OAuth and automatic synchronization are future work. Optional reviewed AI drafts are described below. Requests have timeouts, one bounded retry for transient failures, and rate-limit feedback. No schema migration is required for this update; provenance is stored in existing activity records.
+
+## Optional AI drafts with owner approval
+
+This feature is installed disabled by default. Without an API key, original issue imports continue normally and the UI says AI suggestions are not configured. It never substitutes a mock response for real AI.
+
+For OpenAI API setup, create a project key in your OpenAI platform account and configure API billing/budget controls. ChatGPT subscriptions do not supply API credit. Save these settings only in the existing private backend `.env` and restart the backend:
+
+```dotenv
+AI_SUGGESTIONS_ENABLED=true
+OPENAI_API_KEY=replace-with-your-private-project-key
+OPENAI_MODEL=gpt-4.1-mini-2025-04-14
+```
+
+The model is configurable; use one available to your API project that supports Responses and Structured Outputs. The default snapshot is documented in the [model reference](https://developers.openai.com/api/docs/models/gpt-4.1-mini). Requests follow the [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs), use the fixed OpenAI Responses endpoint, and set `store:false`. This setting does not itself guarantee zero provider retention; review your API account's data controls.
+
+As Owner, preview public issues and select up to three. **Send to OpenAI & draft suggestions** explicitly sends only their public issue numbers, titles and bounded descriptions to OpenAI; API charges apply. It sends no account credentials, project descriptions or local tasks. Each request has a 40-second timeout, an 1,800-output-token cap and no automatic retries. The local single-worker guard allows at most ten attempts per user per hour, at least fifteen seconds apart, including failures; it resets on restart and is not a production spending limit. Configure provider-side budget controls before enabling it.
+
+Drafts show a summary, priority, rationale and a source quote matched exactly against that issue's title/body. Source links are constructed by the app, not generated by the model. This checks provenance but cannot prove the draft's interpretation is correct. Review the original before checking **Approve AI summary and … priority** for each issue. Approval defaults to off; nothing is changed until final import. Unapproved issues keep Medium priority and original text. Approved imports retain the summary, original text and source link, and record the model, suggestion and owner decision in activity history. Cancelling discards the unsaved drafts; cancelled/unimported drafts are not retained in activity history.
+
+The model has no tools, workspace access, notification access or write capability. Untrusted issue instructions are treated as data. Output shape, issue numbers, bounds and source quotes are checked server-side. Refused, incomplete, ungrounded or invalid output is rejected; users can still import the originals. No new tables or changes to existing records/permissions are required. Automated tests mock the provider. A configured real API request and human acceptance check are still required before calling the live AI connection verified.
