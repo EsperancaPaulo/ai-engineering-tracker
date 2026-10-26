@@ -22,16 +22,17 @@ Build an AI-assisted task and issue tracking system for engineering teams. Use R
 
 ## Important limits of the current foundation
 
-The website currently uses plain HTML/CSS/JavaScript served by FastAPI. React has NOT yet been implemented. Projects are shared with all authenticated users; the database has no project owner or team membership yet, so all signed-in users can edit shared projects and delete empty ones. Tasks can only be changed by their assigned user. Users have a role field, but full role-based permissions and team administration are NOT implemented. Activity history is retained but is not a tamper-proof enterprise audit system. Deletion is permanent; audit entries are not an undo feature. A nonempty project cannot be deleted, even if its remaining tasks belong to another user. No existing database tables are migrated for the current management milestone.
+The website uses plain HTML/CSS/JavaScript served by FastAPI; React remains pending. Project-level teams now have Owner, Editor and Viewer permissions. New projects are private until an owner adds registered members. The approved versioned migration added membership and migration-history tables without rewriting original records. Organization-level teams and ownership transfer are not implemented. Activity history is actor-specific, retained, and not a tamper-proof enterprise audit system. Deletion is permanent; nonempty projects cannot be deleted. Private local backups and record-preservation verification were completed before installation. Backup retention, off-device copies and a full operational restore drill remain pending.
 
 ## Next milestones
 
 ### 1. Team-ready core
 
-- [ ] Deploy the prepared project ownership/membership update after approval of the real-database migration.
-- [ ] Deploy the prepared Owner/Editor/Viewer checks, controlled assignments and team task view after the migration.
+- [x] Deploy project ownership/membership with an approved, versioned additive migration and private database backup.
+- [x] Enforce Owner/Editor/Viewer permissions, controlled assignments and a team task view.
 - [ ] Migrate the existing interface to React while preserving the accepted design and working API.
-- [ ] Deploy the prepared task-description UI; extend issue details with the later GitHub/import workflow.
+- [x] Add task descriptions and assignee names to the UI.
+- [ ] Extend issue details with the later GitHub/import workflow.
 - [ ] Define backups, restore and retention before relying on this for team operations.
 
 ### 2. Secure connected sources
@@ -67,8 +68,10 @@ The website currently uses plain HTML/CSS/JavaScript served by FastAPI. React ha
 Preserve existing user records and secrets. Do not publish the local database or credentials. Keep important AI decisions subject to human approval. Do not activate external notifications without the user's authorization. Keep the UI plain and useful. Finish and verify one milestone before describing it as delivered.
 
 
-## Prepared update awaiting deployment approval
+## Team-permissions milestone delivered
 
-The project ownership/membership update is implemented and verified in an isolated test copy. It includes private new projects, project-level Owner/Editor/Viewer permissions, owner-managed registered members and assignments, team task views, descriptions and a versioned additive migration. Automated tests cover role restrictions, nonmember isolation, owner protection, revocation and record-preserving migration. PostgreSQL migration was checked in a temporary rolled-back schema. React, organization-wide administration, ownership transfer and external integrations remain pending.
+The approved team update is installed locally: private new projects, Owner/Editor/Viewer roles, registered-member management, owner-controlled assignments, team task views and task descriptions. The pre-existing sole account became Owner of its existing project. A private PostgreSQL backup was archive-verified before migration; full fingerprints confirmed every original user, project, task and activity row remained unchanged.
 
-The real database and currently running application have not been changed for this update. Automatic approval review requires explicit approval to back up the local database and make the sole existing account Owner of the existing project. The private database backup has now been created and archive-verified. Once the ownership change is explicitly authorized, apply the migration, verify original records unchanged, install the app changes, and update this roadmap's delivered status. Do not describe this prepared milestone as live before that process completes.
+Verification: 62 automated tests passed; PostgreSQL migration/idempotency and isolation passed in a temporary rolled-back schema; browser checks covered the owner/editor screen, descriptions and assignee choices. Live website/API checks confirmed the existing project and task remain, owner membership is correct, team/personal task views work, and unauthenticated access is blocked. A full multi-account browser check is still pending; role restrictions and revocation are covered by automated tests.
+
+Keep completed, verified app updates committed and pushed to GitHub. Exclude real environment settings, database contents, backups and runtime data. React and the remaining integrations/AI milestones above are still pending.

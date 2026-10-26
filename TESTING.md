@@ -1,6 +1,6 @@
 # Testing project teams
 
-These manual checks apply AFTER the membership migration and updated app are installed. Refreshing the current older app will not add this feature by itself. The prepared rollout is awaiting explicit approval of the real ownership change; the local database backup has already been created and archive-verified.
+The team update is installed locally. The membership migration was approved and applied after creating and verifying a private database backup. Existing records were verified unchanged. Use the steps below to check it in your browser.
 
 ## Owner check
 
