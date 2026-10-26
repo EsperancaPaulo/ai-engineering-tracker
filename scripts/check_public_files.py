@@ -17,7 +17,7 @@ private_values = []
 for file in [ROOT / '.env', ROOT / 'backend/.env']:
     if file.exists():
         values = dotenv_values(file)
-        private_values.extend(value.encode() for key,value in values.items() if value and len(value) >= 8 and re.search(r'SECRET|PASSWORD|TOKEN|PRIVATE_KEY|DATABASE_URL',key,re.I))
+        private_values.extend(value.encode() for key,value in values.items() if value and len(value) >= 8 and re.search(r'SECRET|PASSWORD|TOKEN|PRIVATE_KEY|DATABASE_URL|API_KEY',key,re.I))
         url = values.get('DATABASE_URL')
         if url:
             password = urlsplit(url).password
