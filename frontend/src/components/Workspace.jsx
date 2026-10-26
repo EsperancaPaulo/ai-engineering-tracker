@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {jsonOptions} from '../api.js';
 import {Action, activitySummary, Brand, EmptyState, ErrorMessage, roleLabels, SectionHeading, statusLabels} from './Shared.jsx';
+import GitHubImportDialog from './GitHubImportDialog.jsx';
 import ItemDialog from './ItemDialog.jsx';
 import TeamDialog from './TeamDialog.jsx';
 import DeleteDialog from './DeleteDialog.jsx';
@@ -59,6 +60,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
             return <article className="project-card" key={project.id}><div className="project-card-top"><span className="project-icon" aria-hidden="true">⌘</span><span className="tag">{roleLabels[project.role]}</span></div><h3>{project.name}</h3><p>{project.description || 'Your next great idea starts here.'}</p><div className="project-progress"><div className="project-count"><span>{completed} / {personal.length} of your tasks done</span><span>{rate}%</span></div><div className="progress-track"><div className="progress-fill" style={{width:`${rate}%`}}/></div>{project.role !== 'viewer' && <button type="button" className="text-button" onClick={() => create('task',project.id)}>Add a task ↗</button>}<div className="item-actions">
               {project.role !== 'viewer' && <Action label={`Edit project ${project.name}`} onClick={() => setDialog({type:'item',mode:'project',item:project})}>Edit</Action>}
               {project.role === 'owner' && <Action label={`Delete project ${project.name}`} onClick={() => setDialog({type:'delete',mode:'project',item:project})}>Delete</Action>}
+              {project.role === 'owner' && <Action label={`Import GitHub issues into ${project.name}`} onClick={() => setDialog({type:'github',project})}>Import issues</Action>}
               <Action label={`View team for ${project.name}`} onClick={() => setDialog({type:'team',project})}>Team</Action>
             </div></div></article>;
           })}
@@ -72,6 +74,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
       </main>
     </div>
     {dialog?.type === 'item' && <ItemDialog key={`${dialog.mode}-${dialog.item?.id || 'new'}`} {...dialog} initialProjectId={dialog.projectId} projects={projects} user={user} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
+    {dialog?.type === 'github' && <GitHubImportDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'team' && <TeamDialog project={dialog.project} user={user} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'delete' && <DeleteDialog {...dialog} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
   </div>;

@@ -8,3 +8,6 @@ pwdlib[argon2]>=0.3,<0.4
 PyJWT>=2.15,<3
 email-validator>=2.3,<3
 python-multipart>=0.0.32,<0.1
+
+zxcvbn>=4.5,<5
+httpx>=0.28,<0.29

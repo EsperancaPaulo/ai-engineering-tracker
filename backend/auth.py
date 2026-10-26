@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import User
 from schemas import PublicUser, Registration, Token, normalize_email
+from human_verification import require_human, public_settings
+from password_policy import POLICY
 
 # database imports load the backend's .env before settings are read.
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
@@ -64,7 +66,7 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Database
 
 
 @router.post("/auth/register", response_model=PublicUser, status_code=status.HTTP_201_CREATED)
-def register(data: Registration, db: Database):
+def register(data: Registration, db: Database, human=Depends(require_human)):
     email = normalize_email(str(data.email))
     if db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -97,3 +99,8 @@ def login(response: Response, form: Annotated[OAuth2PasswordRequestForm, Depends
 def me(response: Response, user: Annotated[User, Depends(get_current_user)]):
     response.headers["Cache-Control"] = "no-store"
     return user
+
+
+@router.get('/auth/config')
+def registration_config():
+    return {'password_policy': POLICY, 'human_verification': public_settings()}
