@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {jsonOptions} from '../api.js';
 import {Action, activitySummary, Brand, EmptyState, ErrorMessage, roleLabels, SectionHeading, statusLabels} from './Shared.jsx';
 import GitHubImportDialog from './GitHubImportDialog.jsx';
+import FileImportDialog from './FileImportDialog.jsx';
 import ItemDialog from './ItemDialog.jsx';
 import TeamDialog from './TeamDialog.jsx';
 import DeleteDialog from './DeleteDialog.jsx';
@@ -61,6 +62,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
               {project.role !== 'viewer' && <Action label={`Edit project ${project.name}`} onClick={() => setDialog({type:'item',mode:'project',item:project})}>Edit</Action>}
               {project.role === 'owner' && <Action label={`Delete project ${project.name}`} onClick={() => setDialog({type:'delete',mode:'project',item:project})}>Delete</Action>}
               {project.role === 'owner' && <Action label={`Import GitHub issues into ${project.name}`} onClick={() => setDialog({type:'github',project})}>Import issues</Action>}
+              {project.role === 'owner' && <Action label={`Import CSV tasks into ${project.name}`} onClick={() => setDialog({type:'file',project})}>Import file</Action>}
               <Action label={`View team for ${project.name}`} onClick={() => setDialog({type:'team',project})}>Team</Action>
             </div></div></article>;
           })}
@@ -75,6 +77,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
     </div>
     {dialog?.type === 'item' && <ItemDialog key={`${dialog.mode}-${dialog.item?.id || 'new'}`} {...dialog} initialProjectId={dialog.projectId} projects={projects} user={user} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'github' && <GitHubImportDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
+    {dialog?.type === 'file' && <FileImportDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'team' && <TeamDialog project={dialog.project} user={user} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'delete' && <DeleteDialog {...dialog} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
   </div>;

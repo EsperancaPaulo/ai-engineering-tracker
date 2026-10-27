@@ -65,7 +65,7 @@ The automated suites cover missing configuration, invalid/expired/wrong-action/w
 4. Preview again: the same issue must show as already imported. Editors and Viewers should not see import controls; the API also enforces this restriction.
 5. Invalid repository input, unavailable repositories and expired previews should show useful errors without creating tasks.
 
-Current automated verification: 31 frontend tests and 110 backend tests.
+Current automated verification: 34 frontend tests and 127 backend tests.
 
 ## AI review checks (after private API setup)
 
@@ -78,3 +78,15 @@ Current automated verification: 31 frontend tests and 110 backend tests.
 7. With AI disabled or unavailable, original imports must continue; no fake AI draft should be displayed.
 
 Automated checks use mocked provider responses and cover owner-only access, project-bound/expired/tampered previews, explicit consent, no saving during generation, approval/default-original behavior, duplicate prevention, safe failures, local request limits, strict output validation and exact source quotes. Live AI quality and billed API access remain a separate manual check.
+
+## CSV bulk-import checks
+
+1. Hard-refresh, sign in as Owner, and choose Import file on a disposable project. Download CSV template.
+2. Open/save the template as CSV UTF-8, choose it, then Preview file. Confirm tasks/activity have not changed yet and no rows are selected automatically.
+3. Choose Select first ready rows, then Import selected tasks. Check titles, descriptions, priorities, To do status and your assignment.
+4. Preview the same file again: identical rows must be disabled as duplicates. No extra tasks should be created by retrying an import.
+5. Add a row with a missing title or an unsupported priority. Preview should identify that row and keep it unselectable, while allowing valid rows.
+6. Change files after preview: the old preview and selection must disappear. Files over 256 KB should be rejected.
+7. As Editor/Viewer, confirm Import file controls are absent and file-import API access is blocked.
+
+Automated tests cover UTF-8/BOM, quoted commas/multiline fields, malformed/binary uploads, size/row/selection limits, unknown columns, per-row errors, readable Unicode preview sizes, owner authorization, tampered/expired/wrong-project and wrong-workflow tokens, repeated/manual duplicates, replay protection, and preservation of duplicate provenance after edits/deletions. Browser testing uses an isolated demo database. No AI credit or external service is needed.
