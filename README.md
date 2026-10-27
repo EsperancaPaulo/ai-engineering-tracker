@@ -117,7 +117,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The frontend has 39 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 154 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; migration 003 adds five empty workflow/security tables; original records and permissions are preserved.
+The frontend has 41 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 167 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; migration 003 adds five empty workflow/security tables; original records and permissions are preserved.
 
 Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
 
@@ -206,3 +206,11 @@ Assignees must be existing Owners or Editors in that project and are rechecked a
 If an owner explicitly approves an AI priority during GitHub import, that approved priority overrides the rule's priority. The rule's assignment and checklist still apply. Original source IDs/fingerprints remain the basis for duplicate checks, so transformed tasks are not imported again on retries. Applications record rule ID/revision, source, task, actor, priority/assignment before and after, and checklist in activity history.
 
 This version adds an empty `automation_rules` table with migration `002_import_automation`. Back up the existing database before running `python migrate_automation.py` from backend. The additive, transactional/idempotent migration does not rewrite users, tasks, membership, projects or activity. Empty project deletion also removes its rule definitions while retaining activity history. Do not drop the table as an automatic downgrade; pause rules instead.
+
+## Map existing CSV headings
+
+For an exported spreadsheet with headings such as Summary, Notes and Importance, choose Import file → select CSV → Choose my CSV columns → Read column headings. Map a required Task title column and optional Task details/Priority columns; unselected columns are explicitly ignored. Blank details are empty, omitted/blank priorities become Medium, and mapped priority values must still be low/medium/high. Mappings use column positions so repeated heading names can be distinguished. Limits: 40 headings, 100 characters per heading, existing 256 KB/100-row/25-selected limits.
+
+Preview and review the actual rows before selecting/importing. Changes to mappings discard the previous review; changing files clears mapping choices. Mappings are per-file and are not persisted as presets. Status/assignee columns cannot alter permissions or bypass rules. Duplicate fingerprints use the resulting title/details/priority, so mapping and canonical-column imports of identical tasks cannot silently duplicate one another. No AI or schema migration is needed.
+
+`POST /api/projects/{id}/files/columns` accepts bounded raw CSV and returns headings/positions only, owner-only and read-only. Preview can receive an `X-CSV-Mapping` JSON header mapping title/description/priority to distinct zero-based column indexes; unsupported keys and invalid indexes are rejected. The raw upload remains bounded and no original file is stored.

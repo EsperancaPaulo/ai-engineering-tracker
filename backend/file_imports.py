@@ -38,7 +38,7 @@ def fingerprint(row):
     return hashlib.sha256(json.dumps(content, ensure_ascii=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def parse_csv(raw):
+def csv_reader(raw):
     if not raw or len(raw) > MAX_BYTES:
         raise HTTPException(413, 'Choose a nonempty CSV file no larger than 256 KB.')
     try:
@@ -47,10 +47,36 @@ def parse_csv(raw):
         raise HTTPException(422, 'Save the file as CSV UTF-8, then try again.') from None
     if '\x00' in text:
         raise HTTPException(422, 'This file contains unsupported binary content. Choose a CSV UTF-8 task list.')
-    reader = csv.reader(io.StringIO(text, newline=''), strict=True)
+    return csv.reader(io.StringIO(text, newline=''), strict=True)
+
+
+def column_headings(reader):
     try:
-        headers = [value.strip().lower() for value in next(reader)]
-        if 'title' not in headers or len(set(headers)) != len(headers) or set(headers)-{'title', 'description', 'priority'}:
+        headings = [value.strip() for value in next(reader)]
+    except (csv.Error, StopIteration):
+        raise HTTPException(422, 'CSV could not be read. Check commas and quoted fields, or use the template.') from None
+    if not 1 <= len(headings) <= 40 or any(len(value)>100 or any(ord(char)<32 for char in value) for value in headings):
+        raise HTTPException(422, 'Use up to 40 columns with single-line headings up to 100 characters.')
+    return headings
+
+
+def validate_mapping(mapping, count):
+    if not isinstance(mapping, dict) or set(mapping)-{'title','description','priority'} or 'title' not in mapping:
+        raise HTTPException(422, 'Map a title column, with optional description and priority columns.')
+    indexes = list(mapping.values())
+    if any(type(index) is not int or not 0 <= index < count for index in indexes) or len(set(indexes))!=len(indexes):
+        raise HTTPException(422, 'Choose a different existing source column for each mapped field.')
+    return mapping
+
+
+def parse_csv(raw, mapping=None):
+    reader = csv_reader(raw)
+    headings = column_headings(reader)
+    headers = [value.lower() for value in headings]
+    if mapping is not None:
+        mapping = validate_mapping(mapping, len(headings))
+    try:
+        if mapping is None and ('title' not in headers or len(set(headers)) != len(headers) or set(headers)-{'title', 'description', 'priority'}):
             raise HTTPException(422, 'Use a title column, with optional description and priority columns. Download the template for the expected format.')
         rows, errors = [], []
         for number, values in enumerate(reader, start=2):
@@ -63,7 +89,8 @@ def parse_csv(raw):
                 problem = 'The number of values does not match the column headings.'
                 data = {}
             else:
-                data = {key: value.replace('\r\n', '\n').replace('\r', '\n').strip() for key, value in zip(headers, values)}
+                chosen = {key: values[index] for key,index in mapping.items()} if mapping is not None else dict(zip(headers, values))
+                data = {key: value.replace('\r\n', '\n').replace('\r', '\n').strip() for key,value in chosen.items()}
                 data.setdefault('description', '')
                 data['priority'] = data.get('priority', '').lower() or 'medium'
                 if not 1 <= len(data['title']) <= 200:
@@ -141,6 +168,27 @@ def download_template():
     return Response(TEMPLATE, media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="task-import-template.csv"'})
 
 
+async def read_upload(request):
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(raw)+len(chunk)>MAX_BYTES:
+            raise HTTPException(413, 'Choose a file no larger than 256 KB.')
+        raw.extend(chunk)
+    return bytes(raw)
+
+
+@router.post('/projects/{project_id}/files/columns')
+async def inspect_columns(project_id:int, request:Request, db:Database, user:CurrentUser):
+    project_access(db,user,project_id,owner_only=True)
+    if request.headers.get('content-type','').split(';')[0].strip().lower()!='text/csv':
+        raise HTTPException(415, 'Choose a CSV UTF-8 task list for column mapping.')
+    db.rollback()
+    raw=await read_upload(request)
+    headings=column_headings(csv_reader(raw))
+    project_access(db,user,project_id,owner_only=True)
+    return {'columns':[{'index':index,'label':heading or '(blank heading)'} for index,heading in enumerate(headings)]}
+
+
 @router.post('/projects/{project_id}/files/preview')
 async def preview(project_id: int, request: Request, db: Database, user: CurrentUser):
     project_access(db, user, project_id, owner_only=True)
@@ -149,13 +197,21 @@ async def preview(project_id: int, request: Request, db: Database, user: Current
         raise HTTPException(415,'Choose a CSV UTF-8 or .eml email file.')
     user_id = user.id
     db.rollback()
-    raw = bytearray()
-    async for chunk in request.stream():
-        if len(raw)+len(chunk) > MAX_BYTES:
-            raise HTTPException(413, 'Choose a CSV file no larger than 256 KB.')
-        raw.extend(chunk)
+    raw = await read_upload(request)
+    mapping_header = request.headers.get('x-csv-mapping')
+    mapping = None
+    if mapping_header is not None:
+        if content_type=='message/rfc822':
+            raise HTTPException(422, 'Column mapping is only available for CSV files.')
+        if len(mapping_header)>1000:
+            raise HTTPException(422, 'Column mapping is too large.')
+        try: mapping=json.loads(mapping_header)
+        except (ValueError,TypeError):
+            raise HTTPException(422, 'Column mapping could not be read.') from None
+        if mapping is None:
+            raise HTTPException(422, 'Choose the source columns before previewing.')
     source='email' if content_type=='message/rfc822' else 'csv'
-    rows, errors = parse_email(bytes(raw)) if source=='email' else parse_csv(bytes(raw))
+    rows, errors = parse_email(bytes(raw)) if source=='email' else parse_csv(bytes(raw), mapping)
     project_access(db, user, project_id, owner_only=True)
     active_rules = automation.rule_set(db, project_id)
     for row in rows:

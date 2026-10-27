@@ -69,3 +69,7 @@ Inbox notices are private to the recipient and require current membership. Slack
 Private GitHub credentials are used only for the configured project and allowlisted repositories. Imported private content becomes visible to project members and is blocked from AI drafting. Do not reuse a broad personal credential. Saved email imports parse bounded plain/HTML body text without opening attachments or fetching links/images. No automatic mailbox access is enabled. CSV exports escape formula-like strings; reports are member-only.
 
 Backups contain sensitive records. The maintenance utility uses private filesystem permissions, checksums and record fingerprints; its restore drill creates and drops its own isolated temporary database and never restores over live data. Keep archives/manifests out of Git. Production encryption, off-device copies and operator retention controls remain operational responsibilities.
+
+## Explicit CSV mapping
+
+Only owners may inspect bounded column headings or submit mappings. Mappings allow only title, description and priority with distinct in-range integer positions (not booleans); no expressions, arbitrary task properties, statuses or assignments are accepted. Other source columns are ignored only in explicit mapping mode. Canonical imports retain strict headings. Mapped rows pass the same validation, signed preview, rule snapshot, final authorization and persistent duplicate checks as canonical CSV. Changing mapping choices in the UI clears the old review. No source filenames or mapping presets are persisted.

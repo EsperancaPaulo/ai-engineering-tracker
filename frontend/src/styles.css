@@ -78,3 +78,5 @@ select:disabled{opacity:.7;cursor:default}
 .recovery-shell{min-height:100svh;display:grid;place-items:center;padding:30px;background:#f2f7ed}.recovery-panel{width:min(430px,100%);padding:30px;background:white;border:1px solid var(--line);border-radius:14px}.recovery-panel h2{font-size:28px;margin-bottom:15px}.recovery-panel .primary{width:100%;margin-top:22px}.sidebar-bottom>.secondary{margin:0 5px 12px 0}
 .report-task-list{list-style:none;padding:0}.report-task-list li{padding:12px 0;border-bottom:1px solid var(--line);font-size:12px;overflow-wrap:anywhere}.report-task-list small{display:block;color:var(--muted);margin-top:5px}
 .topbar-actions{display:flex;gap:7px}.topbar-actions .secondary{padding:7px 10px;font-size:10px}dialog p{overflow-wrap:anywhere}@media(max-width:760px){.topbar{gap:10px}.topbar-actions .secondary{padding:7px;font-size:9px}}
+
+.file-column-mapping{margin:1rem 0;padding:1rem;border:1px solid var(--border,#dce6df);border-radius:12px}.mapping-toggle{display:flex;align-items:center;gap:.6rem}.mapping-toggle input{width:auto}.column-mapping-fields{display:grid;gap:.8rem;margin:1rem 0}.column-mapping-fields select{width:100%;min-width:0}

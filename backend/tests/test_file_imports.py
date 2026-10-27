@@ -145,3 +145,63 @@ def test_template_is_downloadable_and_parses(client):
     assert response.status_code == 200 and 'attachment' in response.headers['content-disposition']
     rows, errors = files.parse_csv(response.content)
     assert len(rows) == 2 and not errors
+
+
+def test_custom_columns_are_explicit_read_only_and_preserve_deduplication(client):
+    owner,pid,path=setup(client)
+    content=b'Summary,Notes,Importance,Assignee,State\nMapped task,Check release,HIGH,999,done\n'
+    with client.sessions() as db: before=db.scalar(select(func.count()).select_from(ActivityLog))
+    columns=client.post(path+'/columns',content=content,headers={**owner,'Content-Type':'text/csv'})
+    assert columns.status_code==200
+    assert columns.json()['columns'][0]=={'index':0,'label':'Summary'}
+    assert 'Mapped task' not in columns.text
+    assert preview(client,path,owner,content).status_code==422
+    mapped=client.post(path+'/preview',content=content,headers={**owner,'Content-Type':'text/csv','X-CSV-Mapping':json.dumps({'title':0,'description':1,'priority':2})})
+    assert mapped.status_code==200
+    value=mapped.json();row=value['rows'][0]
+    assert row['title']=='Mapped task' and row['description']=='Check release' and row['priority']=='high'
+    assert 'assigned_to' not in row and 'status' not in row
+    assert client.get('/api/tasks',headers=owner).json()==[]
+    with client.sessions() as db: assert db.scalar(select(func.count()).select_from(ActivityLog))==before
+    result=client.post(path+'/import',json={'preview_token':value['preview_token'],'row_numbers':[2]},headers=owner)
+    assert result.json()['imported_count']==1
+    task=client.get('/api/tasks',headers=owner).json()[0]
+    assert task['assigned_to']==1 and task['status']=='todo'
+    canonical=preview(client,path,owner,b'title,description,priority\nMapped task,Check release,high\n').json()
+    assert canonical['rows'][0]['duplicate_reason']
+
+
+@pytest.mark.parametrize('mapping',[{},None,[],{'title':True},{'title':-1},{'title':5},{'title':'0'},{'title':0,'description':0},{'title':0,'status':1},{'title':0,'assigned_to':1}])
+def test_invalid_mappings_cannot_change_tasks(client,mapping):
+    owner,pid,path=setup(client)
+    result=client.post(path+'/preview',content=b'Summary,Other\nTask,Detail\n',headers={**owner,'Content-Type':'text/csv','X-CSV-Mapping':json.dumps(mapping)})
+    assert result.status_code==422
+    assert client.get('/api/tasks',headers=owner).json()==[]
+
+
+def test_mapping_optional_columns_defaults_duplicate_headings_and_validation(client):
+    owner,pid,path=setup(client)
+    content=b'Name,Name,Extra\nIgnored,Chosen,done\n'
+    value=client.post(path+'/preview',content=content,headers={**owner,'Content-Type':'text/csv','X-CSV-Mapping':'{"title":1}'}).json()
+    assert value['rows'][0]['title']=='Chosen' and value['rows'][0]['description']=='' and value['rows'][0]['priority']=='medium'
+    invalid=client.post(path+'/preview',content=b'Summary,Importance\nTask,urgent\n',headers={**owner,'Content-Type':'text/csv','X-CSV-Mapping':'{"title":0,"priority":1}'}).json()
+    assert invalid['rows']==[] and 'Priority' in invalid['errors'][0]['message']
+    for heading in [','.join(['Column']*41),'x'*101,'Bad\x01heading']:
+        result=client.post(path+'/columns',content=(heading+'\nTask\n').encode(),headers={**owner,'Content-Type':'text/csv'})
+        assert result.status_code==422
+    for mapping in ['{broken','x'*1001]:
+        assert client.post(path+'/preview',content=CSV,headers={**owner,'Content-Type':'text/csv','X-CSV-Mapping':mapping}).status_code==422
+
+
+def test_column_inspection_requires_owner_and_bounded_csv(client):
+    owner,pid,path=setup(client)
+    assert client.post(path+'/columns',content=CSV,headers={'Content-Type':'text/csv'}).status_code==401
+    register(client,email='columns@example.com')
+    outsider={'Authorization':'Bearer '+login(client,username='columns@example.com').json()['access_token']}
+    assert client.post(path+'/columns',content=CSV,headers={**outsider,'Content-Type':'text/csv'}).status_code==404
+    client.post(f'/api/projects/{pid}/members',json={'email':'columns@example.com','role':'editor'},headers=owner)
+    assert client.post(path+'/columns',content=CSV,headers={**outsider,'Content-Type':'text/csv'}).status_code==403
+    assert client.post(path+'/columns',content=CSV,headers={**owner,'Content-Type':'message/rfc822'}).status_code==415
+    assert client.post(path+'/columns',content=b'x'*(files.MAX_BYTES+1),headers={**owner,'Content-Type':'text/csv'}).status_code==413
+    assert client.post(path+'/columns',content=b'title\n\xff',headers={**owner,'Content-Type':'text/csv'}).status_code==422
+    assert client.post(path+'/preview',content=b'Subject: Task\n\nBody',headers={**owner,'Content-Type':'message/rfc822','X-CSV-Mapping':'{"title":0}'}).status_code==422

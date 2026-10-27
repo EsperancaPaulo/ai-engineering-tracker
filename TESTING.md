@@ -117,3 +117,13 @@ Forgot password and email verification require configured TLS SMTP. After privat
 Slack preview is separate from sending. Before any live test, verify the bound project/channel, review the exact text, and explicitly enable sending privately. Check one approved update arrives once. A failed/uncertain attempt must not automatically retry; check the channel first. Automated tests mock external delivery. Real Slack/email/private-GitHub acceptance is pending service setup.
 
 This is a milestone checklist. Full-system acceptance will follow the remaining non-AI workflows and service decisions; paid AI checks remain separate.
+
+## Existing spreadsheet column mapping
+
+1. As Owner on a disposable project, upload CSV with Summary, Notes, Importance and an unrelated Owner column. Enable Choose my CSV columns and Read column headings. Nothing should be saved.
+2. Select Summary → Task title, Notes → Task details and Importance → Priority. Leave the unrelated column unused. Preview, check values, select a row, then import. The original status/assignee columns must have no effect; assignments still follow project rules.
+3. Repeat using standard title/description/priority headings with identical values: it should be identified as duplicate.
+4. Change a mapping after preview: previous rows/selection must disappear. Changing files must clear mapping mode/choices. The same source column cannot supply two fields; title is required. Invalid priority values remain row errors.
+5. Viewers, Editors and nonmembers cannot inspect columns or preview/import files. Email imports continue without CSV mapping controls.
+
+Current automated verification: 167 backend and 41 frontend tests.
