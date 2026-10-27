@@ -61,18 +61,18 @@ The automated suites cover missing configuration, invalid/expired/wrong-action/w
 
 1. Sign in as Owner and choose Import issues on a disposable project.
 2. Enter a public `owner/repository` with open issues and preview. Confirm no task is saved yet.
-3. Select one issue and confirm import. Check title, details, source link, To do status, Medium priority and your assignment.
+3. Select one issue and confirm import. Check title, details, source link and To do status. With no matching rule, expect Medium priority and your assignment; otherwise compare with the rule outcomes in preview.
 4. Preview again: the same issue must show as already imported. Editors and Viewers should not see import controls; the API also enforces this restriction.
 5. Invalid repository input, unavailable repositories and expired previews should show useful errors without creating tasks.
 
-Current automated verification: 34 frontend tests and 127 backend tests.
+Current automated verification: 36 frontend tests and 139 backend tests.
 
 ## AI review checks (after private API setup)
 
 1. Sign in as Owner and preview a public repository with open issues. Select one issue.
 2. Read the data-sharing notice, then choose Send to OpenAI & draft suggestions. This is a billed API request. No task should appear yet.
 3. Compare the draft with Original issue details and the source link. The quoted evidence must be present in the source. Approval must start unchecked.
-4. Import without approving AI: original text and Medium priority should be retained. Use a different disposable issue to test approving the AI summary/priority before final import.
+4. Import without approving AI: original text should be retained, using matching rule actions or Medium priority by default. Use a different disposable issue to test approving the AI summary/priority before final import.
 5. Confirm the approved task keeps the original text and link, and Recent activity records the review decision. Preview it again and confirm duplicate import is blocked.
 6. Try the flow as Editor/Viewer: import/AI controls must not be available.
 7. With AI disabled or unavailable, original imports must continue; no fake AI draft should be displayed.
@@ -90,3 +90,16 @@ Automated checks use mocked provider responses and cover owner-only access, proj
 7. As Editor/Viewer, confirm Import file controls are absent and file-import API access is blocked.
 
 Automated tests cover UTF-8/BOM, quoted commas/multiline fields, malformed/binary uploads, size/row/selection limits, unknown columns, per-row errors, readable Unicode preview sizes, owner authorization, tampered/expired/wrong-project and wrong-workflow tokens, repeated/manual duplicates, replay protection, and preservation of duplicate provenance after edits/deletions. Browser testing uses an isolated demo database. No AI credit or external service is needed.
+
+## Import automation acceptance checks
+
+1. Hard-refresh and open Rules on a project you own. Create a rule named Outage triage, keyword `outage`, Look in Title, Priority High, and two checklist items. Leave assignee as Person importing, or choose an existing Editor.
+2. Save draft. It must not apply to imports yet, and Enable must remain blocked.
+3. Preview an example titled Investigate service outage. Check the High priority, assignee and checklist, then enable. Existing tasks must remain unchanged.
+4. Preview a CSV containing that title with Low priority and a second unrelated task. Only the matching row should show the rule actions. Confirm import and inspect tasks/Recent activity.
+5. Preview/import the same source again: it must not create another task or apply the checklist twice.
+6. Create an import preview, then pause/edit the rule in another tab. Importing the old preview should be blocked until you re-preview. Edited rules become drafts.
+7. Test overlapping rules: the earliest-created enabled match wins. Nonmatching rows retain their source values/defaults. A deliberately approved AI priority takes precedence over rule priority.
+8. Test an assignee who becomes Viewer before import: assignment must be rejected. Owner/Editor/Viewer restrictions must remain enforced; only Owners manage rules.
+
+Automated checks cover activation gating, revision/expiry/subject binding, first-match priority, assignment eligibility/rechecks, checklist application, source-dedup preservation, audit-once behavior, stale import previews, invalid actions, role/project isolation and additive migration. PostgreSQL migration/idempotency/draft defaults/cascade behavior are tested in a temporary rolled-back schema. Browser checks use demo records.

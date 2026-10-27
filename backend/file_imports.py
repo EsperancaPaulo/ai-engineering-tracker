@@ -14,6 +14,7 @@ from sqlalchemy import select
 from auth import ALGORITHM, ISSUER, SECRET_KEY, Database
 from models import ActivityLog, Task
 from tracker import CurrentUser, project_access, record
+import automation
 
 router = APIRouter(prefix='/api', tags=['File imports'])
 PREVIEW_ISSUER = ISSUER+'/csv-preview'
@@ -25,7 +26,7 @@ TEMPLATE = 'title,description,priority\nReview release checklist,Check acceptanc
 
 class ImportSelection(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    preview_token: SecretStr = Field(min_length=1, max_length=1500000)
+    preview_token: SecretStr = Field(min_length=1, max_length=3000000)
     row_numbers: list[Annotated[int, Field(ge=2, le=MAX_ROWS+1)]] = Field(min_length=1, max_length=MAX_SELECTION)
 
 
@@ -117,6 +118,9 @@ async def preview(project_id: int, request: Request, db: Database, user: Current
         raw.extend(chunk)
     rows, errors = parse_csv(bytes(raw))
     project_access(db, user, project_id, owner_only=True)
+    active_rules = automation.rule_set(db, project_id)
+    for row in rows:
+        row['automation'] = automation.effects(db, project_id, active_rules, row['title'], row['description'])
     existing = existing_fingerprints(db, project_id)
     seen = set()
     output = []
@@ -125,7 +129,7 @@ async def preview(project_id: int, request: Request, db: Database, user: Current
         output.append({**row, 'duplicate_reason': duplicate})
         seen.add(row['fingerprint'])
     now = datetime.now(timezone.utc)
-    token = jwt.encode({'iss': PREVIEW_ISSUER, 'sub': str(user_id), 'aud': str(project_id), 'iat': now, 'exp': now+timedelta(minutes=5), 'rows': rows}, SECRET_KEY, algorithm=ALGORITHM)
+    token = jwt.encode({'iss': PREVIEW_ISSUER, 'sub': str(user_id), 'aud': str(project_id), 'iat': now, 'exp': now+timedelta(minutes=5), 'rows': rows, 'rule_digest': automation.digest(active_rules)}, SECRET_KEY, algorithm=ALGORITHM)
     return {'preview_token': token, 'rows': output, 'errors': errors, 'maximum_selection': MAX_SELECTION}
 
 
@@ -142,6 +146,7 @@ def import_selected(project_id: int, data: ImportSelection, db: Database, user: 
             raise ValueError()
     except (jwt.InvalidTokenError, ValueError, KeyError, TypeError):
         raise HTTPException(422, 'Preview expired or does not match this import. Preview the file again.') from None
+    automation.check_snapshot(db, project_id, claims.get('rule_digest'))
     existing = existing_fingerprints(db, project_id)
     created, skipped = [], []
     for number in selected:
@@ -152,6 +157,7 @@ def import_selected(project_id: int, data: ImportSelection, db: Database, user: 
         task = Task(title=row['title'], description=row['description'], priority=row['priority'], status='todo', assigned_to=user.id, project_id=project_id)
         db.add(task)
         db.flush()
+        automation.apply(db, user, project_id, task, row.get('automation'), 'csv')
         record(db, user, 'File task imported', json.dumps({'summary': f"CSV row {number}: {row['title']}", 'project_id': project_id, 'task_id': task.id, 'row_number': number, 'fingerprint': row['fingerprint']}))
         existing.add(row['fingerprint'])
         created.append(task.id)

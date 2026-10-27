@@ -41,6 +41,7 @@ Back up an existing database before migrating. From `backend`, apply the version
 
 ```sh
 python migrate.py
+python migrate_automation.py
 uvicorn main:app --reload
 ```
 
@@ -92,6 +93,10 @@ Create a private PostgreSQL backup before applying this update. Migration and pr
 - `POST /api/projects/{id}/files/preview`: Owner-only CSV body (`text/csv`), validates and previews without saving.
 - `POST /api/projects/{id}/files/import`: Owner-only selected `row_numbers` from a signed `preview_token`.
 - `GET /api/task-import-template.csv`: public example template containing no user data.
+- `GET/POST /api/projects/{id}/rules`: Owner-only reusable import rules (new rules are drafts).
+- `PUT /api/projects/{id}/rules/{rule_id}`: edit using current revision; saves as draft.
+- `POST /api/projects/{id}/rules/{rule_id}/preview`: test up to five examples without saving tasks.
+- `PATCH /api/projects/{id}/rules/{rule_id}/state`: pause, or enable using a matching-example preview token.
 - `GET /api/activity`: current actor's latest 20 updates.
 
 Send `Authorization: Bearer <access_token>`. Invalid tokens return 401; insufficient member roles return 403; nonmember access returns 404. Validation returns 422; duplicate membership and protected deletions return 409. Successful DELETE returns 204.
@@ -111,7 +116,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The frontend has 34 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 127 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
+The frontend has 36 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 139 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
 
 Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
 
@@ -146,7 +151,7 @@ Registration fails closed when configuration is missing or verification is unava
 
 ## Public GitHub issue import
 
-As project Owner, choose **Import issues**, enter `owner/repository`, and preview open issues. Previewing saves nothing. Review details and source links, select up to 10 issues, then confirm import. Imported tasks start as To do with Medium priority and are assigned to you. The original text and source link are retained. Repeated imports of the same issue into that project are skipped. Deleted imported tasks are still recorded as previously imported.
+As project Owner, choose **Import issues**, enter `owner/repository`, and preview open issues. Previewing saves nothing. Review details and source links, select up to 10 issues, then confirm import. Imported tasks start as To do with Medium priority and your assignment by default; enabled import rules can change priority/assignee and add checklist text as shown in preview. The original text and source link are retained. Repeated imports of the same issue into that project are skipped. Deleted imported tasks are still recorded as previously imported.
 
 This uses public GitHub data without credentials and never changes GitHub. Pull requests are excluded. Previews expire after five minutes and are bound to the owner and project. Private repositories, OAuth and automatic synchronization are future work. Optional reviewed AI drafts are described below. Requests have timeouts, one bounded retry for transient failures, and rate-limit feedback. No schema migration is required for this update; provenance is stored in existing activity records.
 
@@ -166,7 +171,7 @@ The model is configurable; use one available to your API project that supports R
 
 As Owner, preview public issues and select up to three. **Send to OpenAI & draft suggestions** explicitly sends only their public issue numbers, titles and bounded descriptions to OpenAI; API charges apply. It sends no account credentials, project descriptions or local tasks. Each request has a 40-second timeout, an 1,800-output-token cap and no automatic retries. The local single-worker guard allows at most ten attempts per user per hour, at least fifteen seconds apart, including failures; it resets on restart and is not a production spending limit. Configure provider-side budget controls before enabling it.
 
-Drafts show a summary, priority, rationale and a source quote matched exactly against that issue's title/body. Source links are constructed by the app, not generated by the model. This checks provenance but cannot prove the draft's interpretation is correct. Review the original before checking **Approve AI summary and … priority** for each issue. Approval defaults to off; nothing is changed until final import. Unapproved issues keep Medium priority and original text. Approved imports retain the summary, original text and source link, and record the model, suggestion and owner decision in activity history. Cancelling discards the unsaved drafts; cancelled/unimported drafts are not retained in activity history.
+Drafts show a summary, priority, rationale and a source quote matched exactly against that issue's title/body. Source links are constructed by the app, not generated by the model. This checks provenance but cannot prove the draft's interpretation is correct. Review the original before checking **Approve AI summary and … priority** for each issue. Approval defaults to off; nothing is changed until final import. Unapproved issues keep the original text and use enabled rule actions, with Medium as the default priority. Approved imports retain the summary, original text and source link, and record the model, suggestion and owner decision in activity history. Cancelling discards the unsaved drafts; cancelled/unimported drafts are not retained in activity history.
 
 The model has no tools, workspace access, notification access or write capability. Untrusted issue instructions are treated as data. Output shape, issue numbers, bounds and source quotes are checked server-side. Refused, incomplete, ungrounded or invalid output is rejected; users can still import the originals. No new tables or changes to existing records/permissions are required. Automated tests mock the provider. A configured real API request and human acceptance check are still required before calling the live AI connection verified.
 
@@ -176,10 +181,27 @@ As project Owner, choose **Import file** and download the CSV template. Export/s
 
 Choose a `.csv` file, then Preview file. Uploads are streamed with a 256 KB byte limit, decoded as UTF-8 (BOM accepted), and parsed strictly with at most 100 CSV data records. Quoted commas and multiline descriptions are supported. Titles are 1–200 characters on one line; descriptions are at most 8,000 characters. Blank records are ignored but count toward the 100-record bound. Preview row numbers count CSV records, with headings as row 1; multiline fields remain one record.
 
-The preview identifies valid rows, invalid rows with reasons, and duplicates. It saves no tasks or activity records. Select up to 25 ready rows and confirm import; tasks start as To do and are assigned to you, using the reviewed priority. Use Select first ready rows to avoid ticking every row separately. Correct invalid rows in the source and preview again. Nothing is overwritten.
+The preview identifies valid rows, invalid rows with reasons, and duplicates. It saves no tasks or activity records. Select up to 25 ready rows and confirm import; tasks start as To do with the reviewed priority/assignee; enabled rules can change those defaults as shown in preview. Use Select first ready rows to avoid ticking every row separately. Correct invalid rows in the source and preview again. Nothing is overwritten.
 
 Duplicate checks compare the trimmed title, normalized description line endings and priority. Identical current project tasks or prior file-import fingerprints are skipped, as are repeated selected rows in a file. Duplicate checks run again under the project write lock at confirmation, so replays and overlapping imports do not create extra tasks. Identical imported rows stay marked as previously imported after the task is edited/deleted. Changing title, description or priority creates a different row and may create a new task; this is not synchronization or an update operation.
 
 CSV content goes only to this app, not an AI service. The original file and filename are not stored; valid rows are returned in a signed five-minute preview bound to the owner and project, retained only in browser memory until import/close. Imported tasks and per-row provenance (fingerprint, row number, project/task IDs and actor) are saved in the existing tables. Preview tokens contain readable task content: keep them private and do not share request logs. No new tables, permission changes or paid API calls are required.
 
 CSV is the first file source; Excel workbooks, column mapping, emails, AI processing of private files and scheduled imports remain future work. The bulk workflow removes repetitive data entry now and provides a source for later automation.
+
+## Reusable import automation rules
+
+Project Owners can open **Rules** on a project card. A rule matches a literal, case-insensitive keyword in the title, description, or either field of a new CSV/GitHub import. It can set priority, assign an existing eligible project member, and append checklist text. No regular expressions, AI calls, external notifications or background scheduling are involved. Manual task creation and existing tasks are unaffected.
+
+1. Save the rule as a draft. At least one action is required.
+2. Enter a matching example and choose Preview this rule. This tests the saved rule alone and saves no tasks.
+3. Review the outcome, then enable it for future imports. Activation needs a project/owner/rule/revision-bound preview from the last five minutes.
+4. Preview your CSV or GitHub import. Matched rows show the rule, resulting priority, assignee and checklist. Confirm the selected imports as usual.
+
+Up to 20 reusable rules are supported per project. The first matching enabled rule wins in creation order; later matching rules are not combined. Edit existing rules to reuse them; rule deletion/reordering are not implemented. Editing always pauses a rule, requiring another preview before enabling. Pause stops future applications without undoing past work. Any change to enabled rules invalidates older import previews; re-preview to see current outcomes.
+
+Assignees must be existing Owners or Editors in that project and are rechecked at import. Rules never grant membership or bypass permissions. If a matched rule points to an unavailable/demoted member, fix/pause it and re-preview. Checklist text has up to ten unique nonempty items of 120 characters each; it is appended as `- [ ]` lines in task details, not a separate interactive checklist component. Combined task details remain bounded to 8,000 characters.
+
+If an owner explicitly approves an AI priority during GitHub import, that approved priority overrides the rule's priority. The rule's assignment and checklist still apply. Original source IDs/fingerprints remain the basis for duplicate checks, so transformed tasks are not imported again on retries. Applications record rule ID/revision, source, task, actor, priority/assignment before and after, and checklist in activity history.
+
+This version adds an empty `automation_rules` table with migration `002_import_automation`. Back up the existing database before running `python migrate_automation.py` from backend. The additive, transactional/idempotent migration does not rewrite users, tasks, membership, projects or activity. Empty project deletion also removes its rule definitions while retaining activity history. Do not drop the table as an automatic downgrade; pause rules instead.

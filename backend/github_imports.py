@@ -12,6 +12,7 @@ from auth import ALGORITHM,ISSUER,SECRET_KEY,Database
 from models import ActivityLog,Task
 from tracker import CurrentUser,project_access,record
 import ai_suggestions
+import automation
 
 router=APIRouter(prefix='/api/projects',tags=['GitHub imports'])
 PREVIEW_ISSUER=ISSUER+'/github-preview'
@@ -33,14 +34,14 @@ class PreviewInput(BaseModel):
 
 class ImportInput(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    preview_token:SecretStr=Field(min_length=1,max_length=250000)
+    preview_token:SecretStr=Field(min_length=1,max_length=1500000)
     issue_numbers:list[Annotated[int,Field(gt=0)]]=Field(min_length=1,max_length=10)
     accepted_ai_numbers:list[Annotated[int,Field(gt=0)]]=Field(default_factory=list,max_length=10)
 
 
 class AnalyzeInput(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    preview_token:SecretStr=Field(min_length=1,max_length=250000)
+    preview_token:SecretStr=Field(min_length=1,max_length=1500000)
     issue_numbers:list[Annotated[int,Field(gt=0)]]=Field(min_length=1,max_length=3)
     consent:Literal[True]
 
@@ -128,10 +129,12 @@ def imported_ids(db,project_id):
 def preview(project_id:int,data:PreviewInput,db:Database,user:CurrentUser):
     project_access(db,user,project_id,owner_only=True)
     issues,next_page=fetch_issues(data.repository,data.page)
+    active_rules=automation.rule_set(db,project_id)
+    issues=[{**issue,'automation':automation.effects(db,project_id,active_rules,issue['title'],issue['body']+'\n\nSource: '+issue['url'])} for issue in issues]
     existing=imported_ids(db,project_id)
     now=datetime.now(timezone.utc)
     token=jwt.encode({'iss':PREVIEW_ISSUER,'sub':str(user.id),'aud':str(project_id),'iat':now,'exp':now+timedelta(minutes=5),
-                      'repository':data.repository,'issues':issues},SECRET_KEY,algorithm=ALGORITHM)
+                      'repository':data.repository,'issues':issues,'rule_digest':automation.digest(active_rules)},SECRET_KEY,algorithm=ALGORITHM)
     return {'repository':data.repository,'page':data.page,'has_next':next_page,'preview_token':token,
             'issues':[{**issue,'already_imported':issue['id'] in existing} for issue in issues],
             'ai':ai_suggestions.public_settings()}
@@ -149,6 +152,7 @@ def import_selected(project_id:int,data:ImportInput,db:Database,user:CurrentUser
         if not accepted<=set(selected) or any(not issues[number].get('ai_suggestion') for number in accepted):raise ValueError()
     except (jwt.InvalidTokenError,ValueError,KeyError,TypeError):
         raise HTTPException(422,'Preview expired or does not match this import. Preview the repository again.') from None
+    automation.check_snapshot(db,project_id,claims.get('rule_digest'))
     existing=imported_ids(db,project_id)
     created,skipped=[],[]
     for number in selected:
@@ -160,6 +164,9 @@ def import_selected(project_id:int,data:ImportInput,db:Database,user:CurrentUser
         if approved:description='AI summary (reviewed): '+suggestion['summary']+'\n\nOriginal issue:\n'+description
         task=Task(title=issue['title'],description=description,project_id=project_id,assigned_to=user.id,status='todo',priority=suggestion['priority'] if approved else 'medium')
         db.add(task);db.flush()
+        effect=issue.get('automation')
+        if effect and approved:effect={**effect,'priority':None}
+        automation.apply(db,user,project_id,task,effect,'github')
         record(db,user,'GitHub issue imported',json.dumps({'summary':f"#{number}: {issue['title']}",'project_id':project_id,'github_issue_id':issue['id'],'task_id':task.id,'repository':claims['repository'],'issue_number':number,'source_url':issue['url']}))
         if suggestion:
             record(db,user,'AI suggestion reviewed',json.dumps({'summary':('Approved' if approved else 'Kept original instead of')+f" AI suggestion for #{number}",'project_id':project_id,'task_id':task.id,'source_url':issue['url'],'approved':approved,'suggestion':suggestion}))
