@@ -39,3 +39,31 @@ it('rejects oversized files before upload and keeps failed imports reviewable',a
  await actor.click(await screen.findByRole('button',{name:'Select first 1 ready rows'}));await actor.click(screen.getByRole('button',{name:'Import 1 selected task'}));
  expect((await screen.findByRole('alert')).textContent).toContain('Preview expired');expect(screen.getByRole('checkbox',{name:'Row 2: Release checklist'}).checked).toBe(true);
 });
+it('maps existing headings, ignores extra columns, and invalidates review after mapping changes',async()=>{
+ const actor=userEvent.setup(),api=vi.fn(async path=>path.endsWith('/columns')?{columns:[{index:0,label:'Summary'},{index:1,label:'Notes'},{index:2,label:'Importance'},{index:3,label:'Owner'}]}:preview);
+ render(<FileImportDialog project={project} api={api} onClose={vi.fn()} onSaved={vi.fn()}/>);
+ await actor.upload(screen.getByLabelText('Task list file'),new File(['Summary,Notes,Importance,Owner\nRelease checklist,Check criteria,high,Other\n'],'export.csv',{type:'text/csv'}));
+ await actor.click(screen.getByRole('checkbox',{name:'Choose my CSV columns'}));
+ expect(screen.getByRole('button',{name:'Preview file'}).disabled).toBe(true);
+ await actor.click(screen.getByRole('button',{name:'Read column headings'}));
+ await actor.selectOptions(await screen.findByLabelText('Task title column (required)'),'0');
+ await actor.selectOptions(screen.getByLabelText('Task details column'),'1');await actor.selectOptions(screen.getByLabelText('Priority column'),'2');
+ await actor.click(screen.getByRole('button',{name:'Preview file'}));
+ await screen.findByRole('checkbox',{name:'Row 2: Release checklist'});
+ expect(JSON.parse(api.mock.calls[1][1].headers['X-CSV-Mapping'])).toEqual({title:0,description:1,priority:2});
+ await actor.click(screen.getByRole('checkbox',{name:'Row 2: Release checklist'}));
+ await actor.selectOptions(screen.getByLabelText('Priority column'),'');
+ expect(screen.queryByRole('button',{name:'Import 1 selected task'})).toBe(null);
+ await actor.upload(screen.getByLabelText('Task list file'),file());
+ expect(screen.getByRole('checkbox',{name:'Choose my CSV columns'}).checked).toBe(false);
+ expect(screen.queryByLabelText('Task title column (required)')).toBe(null);
+});
+it('rejects reused mapping columns and never offers CSV mapping for email files',async()=>{
+ const actor=userEvent.setup(),api=vi.fn().mockResolvedValue({columns:[{index:0,label:'Summary'}]});
+ render(<FileImportDialog project={project} api={api} onClose={vi.fn()} onSaved={vi.fn()}/>);
+ await actor.upload(screen.getByLabelText('Task list file'),file());await actor.click(screen.getByRole('checkbox',{name:'Choose my CSV columns'}));await actor.click(screen.getByRole('button',{name:'Read column headings'}));
+ await actor.selectOptions(await screen.findByLabelText('Task title column (required)'),'0');await actor.selectOptions(screen.getByLabelText('Task details column'),'0');await actor.click(screen.getByRole('button',{name:'Preview file'}));
+ expect((await screen.findByRole('alert')).textContent).toContain('different source column');expect(api).toHaveBeenCalledOnce();
+ await actor.upload(screen.getByLabelText('Task list file'),new File(['Subject: Email task\n\nBody'],'task.eml',{type:'message/rfc822'}));
+ expect(screen.queryByRole('checkbox',{name:'Choose my CSV columns'})).toBe(null);
+});

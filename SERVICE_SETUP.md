@@ -12,9 +12,9 @@ Preserve existing `backend/.env`; add settings from `.env.example` privately. Ne
 
 A webhook is bound to its selected channel. Changing the label alone does not change the destination. No automatic background posts or direct messages are active. Official setup: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/
 
-## Email: provider decision first
+## Email: Gmail / Google Workspace selected
 
-Choose Gmail/Google Workspace, Outlook/Microsoft 365 or another provider before creating credentials. Incoming mailbox collection and outgoing account emails are separate capabilities. The current app supports saved `.eml` imports and outgoing certificate-verified SMTP; it does not collect mail automatically or implement OAuth mailbox access yet.
+Gmail / Google Workspace is the selected provider. Incoming mailbox collection and outgoing account emails are separate capabilities. The current app supports saved `.eml` imports and outgoing certificate-verified SMTP; it does not collect mail automatically or implement OAuth mailbox access yet.
 
 Ask your provider for its supported authenticated SMTP configuration. Populate `SMTP_HOST`, port 465 or 587, `SMTP_USERNAME`, `SMTP_PASSWORD` and `SMTP_FROM` privately. Use a dedicated least-privilege app credential only if supported by that provider; never disable account protections to make SMTP work. OAuth-only policies need a provider-specific adapter before activation.
 
@@ -40,3 +40,25 @@ Operational policy: back up before every migration and at the end of an active w
 ## Hosting remains a separate setup
 
 Do not expose the development server. Choose a hosting provider, database/backup plan, domain and spending limit first. HTTPS, production secrets, shared persistent rate limiting, scheduled backups and provider acceptance checks are still required. Docker/hosting deployment has not been verified in this local environment. Paid AI activation remains separate and disabled without funded API access.
+
+### Gmail outgoing recovery emails
+
+1. Open https://myaccount.google.com/security and enable 2-Step Verification yourself if needed.
+2. Open https://myaccount.google.com/apppasswords. If available, create an app password named AI Engineering Tracker. If your Workspace administrator or account policy blocks this, stop and use an OAuth adapter instead; do not weaken protections. Google recommends Sign in with Google when supported.
+3. In the existing private backend `.env`, preserve all other settings and set:
+
+```dotenv
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-sending-email@example.com
+SMTP_PASSWORD=your-private-google-app-password
+SMTP_FROM=your-sending-email@example.com
+APP_PUBLIC_URL=http://127.0.0.1:8000
+REQUIRE_VERIFIED_EMAIL=false
+```
+
+Replace the example addresses with the same actual Gmail sender account. Store the generated app password (without display spacing), never your normal Google password. This is outgoing mail only; it grants no automatic inbox collection in this app. Restart the backend after saving. Then the human tester uses Account → Email me a verification link to their own registered mailbox and completes it themselves. Do not enable mandatory verification until delivery is accepted. Google may restrict sending; a Workspace administrator may require different settings.
+
+Official references: [App passwords](https://support.google.com/mail/answer/185833?hl=en), [SMTP settings](https://support.google.com/mail/answer/7104828?hl=en).
+
+Incoming Gmail collection will use a separate OAuth connection with explicit review of mailbox permissions, dedicated project/label binding and a durable ingestion queue. It is not enabled by SMTP setup. Read-only Gmail scope can read the mailbox broadly even when the app filters a label; Google classifies that scope as restricted. Use a dedicated test mailbox before real team mail. OAuth setup and consent will be guided when that adapter is ready; do not create broad mailbox credentials now. [Google scope reference](https://developers.google.com/workspace/gmail/api/auth/scopes).

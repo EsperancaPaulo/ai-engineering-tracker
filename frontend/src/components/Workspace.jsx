@@ -66,7 +66,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
               {project.role !== 'viewer' && <Action label={`Edit project ${project.name}`} onClick={() => setDialog({type:'item',mode:'project',item:project})}>Edit</Action>}
               {project.role === 'owner' && <Action label={`Delete project ${project.name}`} onClick={() => setDialog({type:'delete',mode:'project',item:project})}>Delete</Action>}
               {project.role === 'owner' && <Action label={`Import GitHub issues into ${project.name}`} onClick={() => setDialog({type:'github',project})}>Import issues</Action>}
-              {project.role === 'owner' && <Action label={`Import CSV tasks into ${project.name}`} onClick={() => setDialog({type:'file',project})}>Import file</Action>}
+              {project.role === 'owner' && <Action label={`Import file tasks into ${project.name}`} onClick={() => setDialog({type:'file',project})}>Import file</Action>}
               {project.role === 'owner' && <Action label={`Manage automation rules for ${project.name}`} onClick={() => setDialog({type:'rules',project})}>Rules</Action>}
               <Action label={`View report for ${project.name}`} onClick={()=>setDialog({type:'report',project})}>Report & updates</Action>
               <Action label={`View team for ${project.name}`} onClick={() => setDialog({type:'team',project})}>Team</Action>
