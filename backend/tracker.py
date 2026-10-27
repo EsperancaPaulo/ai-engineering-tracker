@@ -8,7 +8,7 @@ from sqlalchemy import func, select, delete
 from sqlalchemy.exc import IntegrityError
 
 from auth import Database, get_current_user
-from models import ActivityLog, Project, ProjectMember, Task, User, AutomationRule
+from models import ActivityLog, Project, ProjectMember, Task, User, AutomationRule, InboxNotice, SlackDelivery
 from schemas import normalize_email
 
 router = APIRouter(prefix='/api', tags=['Tracker'])
@@ -188,6 +188,9 @@ def create_task(data: TaskInput, db: Database, user: CurrentUser):
     valid_assignee(db, data.project_id, assignee)
     task = Task(**data.model_dump(exclude={'assigned_to'}), assigned_to=assignee, status='todo')
     db.add(task)
+    db.flush()
+    from workflows import notify_assignee
+    notify_assignee(db,task,user.id)
     record(db, user, 'Task added', data.title)
     db.commit()
     db.refresh(task)
@@ -212,6 +215,9 @@ def update_task(task_id: int, data: TaskUpdate, db: Database, user: CurrentUser)
     before = {field: getattr(task, field) for field in changes}
     for field, value in changes.items():
         setattr(task, field, value)
+    if ('assigned_to' in before and before['assigned_to']!=task.assigned_to) or ('priority' in before and before['priority']!=task.priority and task.priority=='high' and task.status!='done'):
+        from workflows import notify_assignee
+        notify_assignee(db,task,user.id)
     record(db, user, 'Task updated', json.dumps({'summary': f'{task.title}: {task.status}', 'task_id': task.id, 'before': before, 'after': changes}))
     db.commit()
     db.refresh(task)
@@ -250,6 +256,8 @@ def delete_project(project_id: int, db: Database, user: CurrentUser):
     if db.scalar(select(Task.id).where(Task.project_id == project_id).limit(1)) is not None:
         raise HTTPException(409, 'This project still has tasks. Move or delete them before deleting the project.')
     record(db, user, 'Project deleted', json.dumps({'summary': project.name, 'project_id': project.id, 'before': {'name': project.name, 'description': project.description}}))
+    db.execute(delete(InboxNotice).where(InboxNotice.project_id==project_id))
+    db.execute(delete(SlackDelivery).where(SlackDelivery.project_id==project_id))
     db.execute(delete(AutomationRule).where(AutomationRule.project_id == project_id))
     db.execute(delete(ProjectMember).where(ProjectMember.project_id == project_id))
     db.delete(project)

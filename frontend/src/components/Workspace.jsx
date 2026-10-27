@@ -7,6 +7,9 @@ import AutomationRulesDialog from './AutomationRulesDialog.jsx';
 import ItemDialog from './ItemDialog.jsx';
 import TeamDialog from './TeamDialog.jsx';
 import DeleteDialog from './DeleteDialog.jsx';
+import ProjectReportDialog from './ProjectReportDialog.jsx';
+import InboxDialog from './InboxDialog.jsx';
+import AccountDialog from './AccountDialog.jsx';
 
 const emptyData = {projects: [], tasks: [], teamTasks: [], activity: []};
 const titles = {
@@ -47,7 +50,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
     <aside className="sidebar"><Brand sidebar/><p className="nav-label">WORKSPACE</p><nav aria-label="Main navigation">{[['overview','◫','Overview'],['projects','▤','Projects'],['tasks','✓','My tasks'],['activity','◷','Activity']].map(([key,icon,label]) => <button key={key} type="button" className={`nav-item ${view === key ? 'active' : ''}`} aria-current={view === key ? 'page' : undefined} onClick={() => setView(key)}><span aria-hidden="true">{icon}</span>{label}</button>)}</nav>
       <div className="sidebar-bottom"><div className="build-note"><span className="eyebrow">KEEP SHOWING UP</span><p>Big things start<br/>with small commits.</p><span aria-hidden="true">↗</span></div><div className="profile"><span className="avatar">{user.name.slice(0,1).toUpperCase()}</span><div><strong>{user.name}</strong><small>Developer workspace</small></div></div><button type="button" className="logout" onClick={onSignOut}>Sign out <span aria-hidden="true">↗</span></button></div>
     </aside>
-    <div className="workspace"><header className="topbar"><span>Workspace / {view === 'tasks' ? 'My tasks' : view[0].toUpperCase() + view.slice(1)}</span><span className="connection"><span className="signal"/>{loading ? 'Updating your workspace…' : error ? 'Workspace needs attention' : 'Connected to your workspace'}</span></header>
+    <div className="workspace"><header className="topbar"><span>Workspace / {view === 'tasks' ? 'My tasks' : view[0].toUpperCase() + view.slice(1)}</span><span className="connection"><span className="signal"/>{loading ? 'Updating your workspace…' : error ? 'Workspace needs attention' : 'Connected to your workspace'}</span><div className="topbar-actions"><button type="button" className="secondary" onClick={()=>setDialog({type:'account'})}>Account</button><button type="button" className="secondary" onClick={()=>setDialog({type:'inbox'})}>Notifications</button></div></header>
       <main className="main-content"><div className="page-heading"><div><p className="eyebrow">{date}</p><h1>{titles[view][0]}</h1><p>{titles[view][1]}</p></div><button type="button" className="primary compact" onClick={() => create('project')}>+ New project</button></div>
         <ErrorMessage message={error}/>{error && <button type="button" className="secondary" onClick={refresh} disabled={loading}>Retry connection</button>}
         {loading && <p className="loading-note" role="status">Updating your workspace…</p>}
@@ -65,6 +68,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
               {project.role === 'owner' && <Action label={`Import GitHub issues into ${project.name}`} onClick={() => setDialog({type:'github',project})}>Import issues</Action>}
               {project.role === 'owner' && <Action label={`Import CSV tasks into ${project.name}`} onClick={() => setDialog({type:'file',project})}>Import file</Action>}
               {project.role === 'owner' && <Action label={`Manage automation rules for ${project.name}`} onClick={() => setDialog({type:'rules',project})}>Rules</Action>}
+              <Action label={`View report for ${project.name}`} onClick={()=>setDialog({type:'report',project})}>Report & updates</Action>
               <Action label={`View team for ${project.name}`} onClick={() => setDialog({type:'team',project})}>Team</Action>
             </div></div></article>;
           })}
@@ -81,6 +85,9 @@ export default function Workspace({user, api, onSignOut, notify}) {
     {dialog?.type === 'github' && <GitHubImportDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'file' && <FileImportDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'rules' && <AutomationRulesDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
+    {dialog?.type === 'report' && <ProjectReportDialog project={dialog.project} api={api} onClose={()=>setDialog(null)} onSaved={saved}/>}
+    {dialog?.type === 'inbox' && <InboxDialog api={api} onClose={()=>setDialog(null)}/>}
+    {dialog?.type === 'account' && <AccountDialog user={user} api={api} onClose={()=>setDialog(null)}/>}
     {dialog?.type === 'team' && <TeamDialog project={dialog.project} user={user} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'delete' && <DeleteDialog {...dialog} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
   </div>;

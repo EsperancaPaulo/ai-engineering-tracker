@@ -44,7 +44,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The suite uses separate SQLite databases and test signing secrets. PostgreSQL migration and nonmember isolation have also been verified in a temporary schema that was rolled back. These checks do not substitute for a backup or full operational restore drill.
+The suite uses separate SQLite databases and test signing secrets. PostgreSQL migration and nonmember isolation have also been verified in a temporary schema that was rolled back. A separate private backup and full isolated PostgreSQL restore drill have also passed.
 
 ## Password and human-verification checks
 
@@ -65,7 +65,7 @@ The automated suites cover missing configuration, invalid/expired/wrong-action/w
 4. Preview again: the same issue must show as already imported. Editors and Viewers should not see import controls; the API also enforces this restriction.
 5. Invalid repository input, unavailable repositories and expired previews should show useful errors without creating tasks.
 
-Current automated verification: 36 frontend tests and 139 backend tests.
+Current automated verification: 39 frontend tests and 154 backend tests.
 
 ## AI review checks (after private API setup)
 
@@ -103,3 +103,17 @@ Automated tests cover UTF-8/BOM, quoted commas/multiline fields, malformed/binar
 8. Test an assignee who becomes Viewer before import: assignment must be rejected. Owner/Editor/Viewer restrictions must remain enforced; only Owners manage rules.
 
 Automated checks cover activation gating, revision/expiry/subject binding, first-match priority, assignment eligibility/rechecks, checklist application, source-dedup preservation, audit-once behavior, stale import previews, invalid actions, role/project isolation and additive migration. PostgreSQL migration/idempotency/draft defaults/cascade behavior are tested in a temporary rolled-back schema. Browser checks use demo records.
+
+## Non-AI workflows (migration 003)
+
+Use disposable project records. Open Report & updates, compare totals/statuses with tasks, search the paged task list and download CSV. Only members can access reports/exports. Formula-like task text is escaped for spreadsheets. Counts reflect records, not estimated hours saved.
+
+Import a saved `.eml` message through Import file. Preview must show subject/body without saving, ignore attachments/remote images, and apply enabled rules. Confirm one selected row, then repeat preview to check duplicates. No mailbox is read automatically.
+
+Assign a new task to another Editor; their Notifications should show it, with no other user's notices. Mark it read. Account can disable future assignment notices. Removing membership hides old project notices.
+
+Forgot password and email verification require configured TLS SMTP. After private setup, the human tester requests a link to their own mailbox and completes it. Links expire after 30 minutes and work once. Strong password checks apply to resets; resetting invalidates older sessions. Existing sign-in remains available while verification enforcement is off.
+
+Slack preview is separate from sending. Before any live test, verify the bound project/channel, review the exact text, and explicitly enable sending privately. Check one approved update arrives once. A failed/uncertain attempt must not automatically retry; check the channel first. Automated tests mock external delivery. Real Slack/email/private-GitHub acceptance is pending service setup.
+
+This is a milestone checklist. Full-system acceptance will follow the remaining non-AI workflows and service decisions; paid AI checks remain separate.

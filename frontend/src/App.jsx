@@ -18,5 +18,5 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [session,signOut]);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
-  return <>{session ? <Workspace key={session.token} user={session.user} api={api} notify={notify} onSignOut={() => signOut()}/> : <Auth notice={notice} onSignIn={value => {setNotice(''); setSession(value);}}/>}{toast && <div className="toast" role="status">{toast}</div>}</>;
+  return <>{session ? <Workspace key={session.token} user={session.user} api={api} notify={notify} onSignOut={() => {const logoutApi=api;signOut();logoutApi('/auth/logout',{method:'POST'}).catch(()=>setNotice('Signed out locally. Server revocation could not be confirmed; the token will expire automatically.'));}}/> : <Auth notice={notice} onSignIn={value => {setNotice(''); setSession(value);}}/>}{toast && <div className="toast" role="status">{toast}</div>}</>;
 }

@@ -3,10 +3,13 @@ import {createApi, jsonOptions} from '../api.js';
 import HumanVerification from './HumanVerification.jsx';
 import {assessPassword} from '../passwordPolicy.js';
 import {Brand, ErrorMessage} from './Shared.jsx';
+import AccountRecovery from './AccountRecovery.jsx';
 const api = createApi();
 
 export default function Auth({onSignIn, notice = ''}) {
   const [mode, setMode] = useState('login');
+  const [linkAction,setLinkAction]=useState(()=>{const values=new URLSearchParams(window.location.hash.slice(1));return {reset:values.get('reset'),verify:values.get('verify')};});
+  useEffect(()=>{if(linkAction.reset||linkAction.verify)window.history.replaceState(null,'',window.location.pathname);},[]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const registering = mode === 'register';
@@ -36,9 +39,11 @@ export default function Auth({onSignIn, notice = ''}) {
       onSignIn({token: data.access_token, user, expiresAt: Date.now() + data.expires_in * 1000});
     } catch (error) {setError(error.message);if(registering){setHumanToken('');setResetVersion(value=>value+1);}} finally {setBusy(false);}
   }
+  if(mode==='recovery'||linkAction.reset||linkAction.verify)return <div className="recovery-shell"><AccountRecovery action={linkAction} onBack={()=>{setMode('login');setLinkAction({});}}/></div>;
   return <div className="auth-layout" id="auth-view">
     <section className="intro"><Brand/><div className="intro-copy"><span className="eyebrow">SMALL STEPS. REAL PROGRESS.</span><h1>Build skills.<br/>Ship projects.<br/><em>See your growth.</em></h1><p>A focused workspace for your journey in AI engineering. Turn ambitious ideas into your next completed task.</p><div className="intro-note"><span className="signal"/> Your next chapter starts with one small step.</div></div><footer>Made for the work that moves you forward.<span>01 / YOUR WORKSPACE</span></footer></section>
     <main className="auth-panel"><div className="auth-card"><span className="eyebrow">LET’S GET BUILDING</span><h2>{registering ? 'Start your next chapter.' : 'Welcome back.'}</h2><p>{registering ? 'Create a workspace for your progress.' : 'Sign in and pick up where you left off.'}</p>
+      {!registering&&<button type="button" className="text-button" onClick={()=>setMode('recovery')}>Forgot password?</button>}
       <div className="auth-tabs" role="group" aria-label="Choose account action">{[['login','Sign in'],['register','Create account']].map(([value,label]) => <button key={value} type="button" disabled={busy} aria-pressed={mode === value} className={mode === value ? 'selected' : ''} onClick={() => {setMode(value); setError('');setPassword('');setConfirmation('');setHumanToken('');}}>{label}</button>)}</div>
       <form id="auth-form" onSubmit={submit}>
         {registering && <><label htmlFor="name">Your name</label><input id="name" name="name" value={name} onChange={e=>setName(e.target.value)} autoComplete="name" maxLength={100} required disabled={busy}/></>}

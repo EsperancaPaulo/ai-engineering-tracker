@@ -130,6 +130,8 @@ def apply(db,user,project_id,task,effect,source):
     if len(task.description)>8000:
         raise HTTPException(422,'Task details plus automation checklist exceed 8,000 characters. Shorten the source or rule and preview again.')
     db.flush()
+    from workflows import notify_assignee
+    notify_assignee(db,task,user.id)
     record(db,user,'Automation applied',json.dumps({'summary':f"{effect['rule_name']}: {task.title}",'project_id':project_id,'task_id':task.id,'source':source,'rule_id':effect['rule_id'],'rule_revision':effect['revision'],'before':before,'after':{'priority':task.priority,'assigned_to':task.assigned_to},'checklist':effect['checklist']}))
 
 

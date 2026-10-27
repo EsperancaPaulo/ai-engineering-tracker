@@ -113,3 +113,8 @@ it('shows live password requirements and refuses submission until every check pa
  expect([...document.querySelectorAll('#password-checks li')].every(item=>item.dataset.passed==='true')).toBe(true);
  fireEvent.change(password,{target:{value:'short'}});expect(submit.disabled).toBe(true);
 });
+it('offers account recovery without changing the sign-in form',async()=>{
+ const actor=userEvent.setup();render(<Auth onSignIn={vi.fn()}/>);
+ await actor.click(screen.getByRole('button',{name:'Forgot password?'}));expect(screen.getByRole('heading',{name:'Recover your account'})).toBeTruthy();
+ await actor.click(screen.getByRole('button',{name:'Back to sign in'}));expect(screen.getByRole('heading',{name:'Welcome back.'})).toBeTruthy();
+});

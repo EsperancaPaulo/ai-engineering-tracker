@@ -10,13 +10,13 @@ export default function FileImportDialog({project,api,onClose,onSaved}){
  function choose(event){
   const next=event.target.files?.[0]||null;setPreview(null);setSelected([]);setError('');setFile(null);
   if(!next)return;
-  if(!next.name.toLowerCase().endsWith('.csv')){setError('Choose a CSV file. You can download the template below.');return;}
-  if(!next.size||next.size>MAX_BYTES){setError('Choose a nonempty CSV file no larger than 256 KB.');return;}
+  if(!/\.(csv|eml)$/i.test(next.name)){setError('Choose a CSV task list or an .eml email file.');return;}
+  if(!next.size||next.size>MAX_BYTES){setError('Choose a nonempty file no larger than 256 KB.');return;}
   setFile(next);
  }
  async function load(event){
   event.preventDefault();if(!file)return;setBusy(true);setError('');setSelected([]);
-  try{setPreview(await api(`/api/projects/${project.id}/files/preview`,{method:'POST',headers:{'Content-Type':'text/csv; charset=utf-8'},body:file}));}
+  try{setPreview(await api(`/api/projects/${project.id}/files/preview`,{method:'POST',headers:{'Content-Type':file.name.toLowerCase().endsWith('.eml')?'message/rfc822':'text/csv; charset=utf-8'},body:file}));}
   catch(error){setPreview(null);setError(error.message);}finally{setBusy(false);}
  }
  async function submit(){
@@ -28,10 +28,10 @@ export default function FileImportDialog({project,api,onClose,onSaved}){
  }
  const available=preview?.rows.filter(row=>!row.duplicate_reason)||[];
  const maximum=preview?.maximum_selection||25;
- return <Modal title="Import tasks from CSV" titleId="file-import-title" onClose={onClose}>
+ return <Modal title="Import tasks from a file" titleId="file-import-title" onClose={onClose}>
   <p className="subtle">Bring a task list into {project.name} without retyping it. Review the rows before saving.</p>
-  <section className="file-import-help"><a className="template-link" href="/api/task-import-template.csv" download="task-import-template.csv">Download CSV template ↗</a><p>CSV UTF-8 · up to 256 KB and 100 rows. Columns: title, description, priority. Title is required; blank priorities become Medium.</p><p>Files are processed locally by this app and are not sent to AI. The original file is not stored.</p></section>
-  <form onSubmit={load}><label htmlFor="task-csv">Task list file</label><input id="task-csv" type="file" accept=".csv,text/csv" onChange={choose} disabled={busy}/><button className="secondary" type="submit" disabled={busy||!file}>{busy?'Working…':'Preview file'}</button></form>
+  <section className="file-import-help"><a className="template-link" href="/api/task-import-template.csv" download="task-import-template.csv">Download CSV template ↗</a><p>CSV UTF-8 (up to 100 rows) or one .eml email · up to 256 KB. Columns: title, description, priority. Title is required; blank priorities become Medium.</p><p>Files are processed locally by this app and are not sent to AI. The original file is not stored. Email attachments and remote images are ignored.</p></section>
+  <form onSubmit={load}><label htmlFor="task-csv">Task list file</label><input id="task-csv" type="file" accept=".csv,.eml,text/csv,message/rfc822" onChange={choose} disabled={busy}/><button className="secondary" type="submit" disabled={busy||!file}>{busy?'Working…':'Preview file'}</button></form>
   <ErrorMessage message={error}/>
   {preview&&<>
    <div className="file-preview-summary" role="status">Ready: {available.length} · Duplicates: {preview.rows.length-available.length} · Invalid: {preview.errors.length}</div>
