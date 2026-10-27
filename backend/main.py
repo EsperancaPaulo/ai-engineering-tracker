@@ -39,6 +39,8 @@ from tracker import router as tracker_router
 app.include_router(tracker_router)
 from github_imports import router as github_router
 app.include_router(github_router)
+from file_imports import router as file_router
+app.include_router(file_router)
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 app.mount("/assets", StaticFiles(directory=FRONTEND / "assets", check_dir=False), name="assets")
 

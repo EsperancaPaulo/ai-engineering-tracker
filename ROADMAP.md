@@ -39,7 +39,8 @@ The website now uses React with Vite, with its compiled assets served by FastAPI
 
 - [x] Import selected public GitHub issues with preview, source links and duplicate prevention.
 - [ ] Connect private GitHub repositories with minimum-permission credentials.
-- [ ] Add email/file import with previews and validation before saving.
+- [x] Add CSV task import with previews, validation, owner confirmation and duplicate prevention.
+- [ ] Extend sources to email and other file formats.
 - [ ] Add secure credential storage, minimum permissions, and clear connection management.
 - [x] Add GitHub import error handling, bounded retries and duplicate prevention.
 
@@ -91,3 +92,9 @@ New-account passwords are checked locally for length and guessability without AI
 ## Reviewed AI draft implementation — awaiting live API acceptance
 
 The optional owner-only public-issue AI workflow is implemented with structured summaries, explained priority suggestions, exact source quotes, separate per-issue approval and final import confirmation. It preserves originals and records imported review decisions without a database migration. It remains disabled without private OpenAI API configuration; no simulated AI is shown. Automated validation uses mocked provider responses. The AI milestones above remain unchecked until a real configured API request and human acceptance test pass. Durable usage accounting, cancelled-draft history and production spending/rate safeguards remain pending.
+
+## CSV bulk-import milestone
+
+Owners can preview bounded CSV UTF-8 task lists, inspect errors/duplicates, select up to 25 rows at once and confirm additive imports. Titles/details/priorities are copied automatically, tasks start as To do assigned to the owner, and original import fingerprints prevent accidental repeated entry. No AI credit, external upload, schema migration or existing record changes are needed. Automated validation: 34 frontend tests and 127 backend tests.
+
+Automation direction remains source ingestion → validation/deduplication → optional AI summary/priority drafts → human approval of important changes → controlled assignments/notifications and audit history. Next candidates are reusable import rules and mappings, then email ingestion and queued jobs. AI activation remains pending available credits and live acceptance; its implementation is retained.

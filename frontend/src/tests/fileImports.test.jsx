@@ -1,0 +1,41 @@
+import React from 'react';
+import {render,screen,waitFor,within} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {it,expect,vi} from 'vitest';
+import FileImportDialog from '../components/FileImportDialog.jsx';
+const project={id:1,name:'Release work',role:'owner'};
+const file=()=>new File(['title,description,priority\nRelease checklist,Check acceptance criteria,high\n'],'tasks.csv',{type:'text/csv'});
+const preview={preview_token:'signed-file-preview',maximum_selection:25,rows:[{row_number:2,title:'Release checklist',description:'Check acceptance criteria',priority:'high',duplicate_reason:null},{row_number:3,title:'Repeated row',description:'',priority:'medium',duplicate_reason:'Repeated row in this file'}],errors:[{row_number:4,message:'Title must contain 1–200 characters.'}]};
+it('previews a file without saving and imports only reviewed selected rows',async()=>{
+ const actor=userEvent.setup(),close=vi.fn(),saved=vi.fn();
+ const api=vi.fn(async path=>path.endsWith('/preview')?preview:{imported_count:1,skipped_row_numbers:[]});
+ render(<FileImportDialog project={project} api={api} onClose={close} onSaved={saved}/>);
+ expect(screen.getByRole('link',{name:'Download CSV template ↗'}).getAttribute('href')).toBe('/api/task-import-template.csv');
+ await actor.upload(screen.getByLabelText('Task list file'),file());expect(api).not.toHaveBeenCalled();
+ await actor.click(screen.getByRole('button',{name:'Preview file'}));
+ const row=await screen.findByRole('checkbox',{name:'Row 2: Release checklist'});
+ expect(row.checked).toBe(false);expect(api).toHaveBeenCalledOnce();expect(close).not.toHaveBeenCalled();
+ expect(api.mock.calls[0][1].body).toBeInstanceOf(File);
+ expect(screen.getByRole('checkbox',{name:'Row 3: Repeated row'}).disabled).toBe(true);
+ expect(within(screen.getByRole('region',{name:'Rows needing correction'})).getByText(/Row 4:/)).toBeTruthy();
+ await actor.click(row);await actor.click(screen.getByRole('button',{name:'Import 1 selected task'}));
+ await waitFor(()=>expect(close).toHaveBeenCalledOnce());expect(saved).toHaveBeenCalledOnce();
+ expect(JSON.parse(api.mock.calls[1][1].body)).toEqual({preview_token:'signed-file-preview',row_numbers:[2]});
+});
+it('discards the old preview when the selected file changes',async()=>{
+ const actor=userEvent.setup(),api=vi.fn().mockResolvedValue(preview);
+ render(<FileImportDialog project={project} api={api} onClose={vi.fn()} onSaved={vi.fn()}/>);
+ await actor.upload(screen.getByLabelText('Task list file'),file());await actor.click(screen.getByRole('button',{name:'Preview file'}));
+ await actor.click(await screen.findByRole('checkbox',{name:'Row 2: Release checklist'}));
+ await actor.upload(screen.getByLabelText('Task list file'),new File(['title\nChanged task\n'],'other.csv',{type:'text/csv'}));
+ expect(screen.queryByRole('button',{name:'Import 1 selected task'})).toBe(null);expect(api).toHaveBeenCalledOnce();
+});
+it('rejects oversized files before upload and keeps failed imports reviewable',async()=>{
+ const actor=userEvent.setup(),api=vi.fn(async path=>{if(path.endsWith('/import'))throw new Error('Preview expired. Preview the file again.');return preview;});
+ render(<FileImportDialog project={project} api={api} onClose={vi.fn()} onSaved={vi.fn()}/>);
+ await actor.upload(screen.getByLabelText('Task list file'),new File(['x'.repeat(256*1024+1)],'large.csv',{type:'text/csv'}));
+ expect((await screen.findByRole('alert')).textContent).toContain('256 KB');expect(api).not.toHaveBeenCalled();
+ await actor.upload(screen.getByLabelText('Task list file'),file());await actor.click(screen.getByRole('button',{name:'Preview file'}));
+ await actor.click(await screen.findByRole('button',{name:'Select first 1 ready rows'}));await actor.click(screen.getByRole('button',{name:'Import 1 selected task'}));
+ expect((await screen.findByRole('alert')).textContent).toContain('Preview expired');expect(screen.getByRole('checkbox',{name:'Row 2: Release checklist'}).checked).toBe(true);
+});
