@@ -46,3 +46,16 @@ def test_empty_database_migration():
     with engine.begin() as connection:
         assert upgrade(connection) is True
         assert list(connection.scalars(select(ProjectMember.user_id)))==[]
+
+
+def test_automation_migration_adds_empty_storage_without_rewriting_records():
+    from models import AutomationRule
+    from migrate_automation import upgrade as upgrade_automation
+    engine=legacy_database()
+    with engine.begin() as connection:
+        upgrade(connection)
+        before={model.__tablename__:connection.execute(select(model.__table__)).all() for model in [User,Project,Task,ActivityLog,ProjectMember]}
+        assert upgrade_automation(connection) is True
+        assert upgrade_automation(connection) is False
+        assert connection.scalar(select(func.count()).select_from(AutomationRule))==0
+        for model in [User,Project,Task,ActivityLog,ProjectMember]:assert connection.execute(select(model.__table__)).all()==before[model.__tablename__]

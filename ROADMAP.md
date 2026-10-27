@@ -98,3 +98,11 @@ The optional owner-only public-issue AI workflow is implemented with structured 
 Owners can preview bounded CSV UTF-8 task lists, inspect errors/duplicates, select up to 25 rows at once and confirm additive imports. Titles/details/priorities are copied automatically, tasks start as To do assigned to the owner, and original import fingerprints prevent accidental repeated entry. No AI credit, external upload, schema migration or existing record changes are needed. Automated validation: 34 frontend tests and 127 backend tests.
 
 Automation direction remains source ingestion → validation/deduplication → optional AI summary/priority drafts → human approval of important changes → controlled assignments/notifications and audit history. Next candidates are reusable import rules and mappings, then email ingestion and queued jobs. AI activation remains pending available credits and live acceptance; its implementation is retained.
+
+## Reusable import rules milestone
+
+Owner-managed draft rules now support case-insensitive literal keyword matches, priorities, existing-member assignment and standard checklist text for CSV/GitHub imports. Matching-example preview is required before activation. First matching enabled rule wins; changes invalidate old import previews, and edits pause the rule. Final imports recheck eligible assignees and write rule-action history atomically with tasks, preserving source duplicate protection. Existing tasks and permissions remain unchanged.
+
+The 002 migration adds empty rule storage after a private archive-verified backup. Migration/idempotency/preservation are checked with SQLite fixtures and temporary rolled-back PostgreSQL schemas. Verification: 36 frontend tests and 139 backend tests, plus browser draft/preview/activation/import checks using isolated demo records.
+
+Next automation work: incoming email/queued source ingestion, column mappings and scheduling, then controlled Slack notifications and durable usage metrics. AI summaries/priorities remain implemented but live acceptance awaits API credits. Rules reduce repetitive triage now; they do not replace the planned AI understanding of less predictable work.

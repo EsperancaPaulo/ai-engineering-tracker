@@ -1,6 +1,7 @@
 import React,{useState} from 'react';
 import {jsonOptions} from '../api.js';
 import {ErrorMessage,Modal} from './Shared.jsx';
+import AutomationPreview from './AutomationPreview.jsx';
 
 export default function GitHubImportDialog({project,api,onClose,onSaved}){
  const [repository,setRepository]=useState(''),[preview,setPreview]=useState(null),[selected,setSelected]=useState([]);
@@ -39,7 +40,7 @@ export default function GitHubImportDialog({project,api,onClose,onSaved}){
    <button type="submit" className="secondary" disabled={busy}>{busy?'Working…':'Preview issues'}</button>
   </form><ErrorMessage message={error}/>
   {preview&&<>
-   <p className="field-hint">Page {preview.page}. Select up to 10 issues. Imported tasks start as To do, assigned to you. Nothing is saved as a task until you confirm.</p>
+   <p className="field-hint">Page {preview.page}. Select up to 10 issues. Imported tasks start as To do. Enabled rules may set priority, assignee and checklist; otherwise they are assigned to you. Nothing is saved as a task until you confirm.</p>
    {preview.issues.length>0&&<section className="ai-import-help" aria-label="AI assistance">
     <h3>Optional AI assistance</h3>
     {preview.ai?.ready?<>
@@ -54,6 +55,7 @@ export default function GitHubImportDialog({project,api,onClose,onSaved}){
      <label><input type="checkbox" checked={selected.includes(issue.number)} disabled={busy||issue.already_imported||(!selected.includes(issue.number)&&selected.length>=10)} onChange={e=>select(issue.number,e.target.checked)}/><span>#{issue.number} {issue.title}{issue.already_imported&&<small>Already imported</small>}</span></label>
      <a href={issue.url} target="_blank" rel="noopener noreferrer">View on GitHub ↗</a>
      <details><summary>Original issue details</summary><p>{issue.body||'No description provided.'}</p></details>
+     <AutomationPreview effect={issue.automation} aiOverride={accepted.includes(issue.number)}/>
      {issue.ai_suggestion&&<section className="ai-draft" aria-label={`AI draft for issue ${issue.number}`}>
       <h3>AI draft · review required</h3><p>{issue.ai_suggestion.summary}</p>
       <p><strong>Suggested priority: {issue.ai_suggestion.priority}</strong></p><p>{issue.ai_suggestion.rationale}</p>
@@ -64,7 +66,7 @@ export default function GitHubImportDialog({project,api,onClose,onSaved}){
     </article>)}
    </div>
    <div className="import-pagination"><button className="secondary" type="button" disabled={busy||preview.page===1} onClick={()=>load(preview.page-1)}>Previous</button><button className="secondary" type="button" disabled={busy||!preview.has_next} onClick={()=>load(preview.page+1)}>Next</button></div>
-   <p className="field-hint">{accepted.length} AI suggestion{accepted.length===1?'':'s'} approved. Other selected issues keep their original text and Medium priority. Original text and source links are retained in every task.</p>
+   <p className="field-hint">{accepted.length} AI suggestion{accepted.length===1?'':'s'} approved. Approved AI priority overrides a rule priority; other rule actions still apply. Without approval, rules apply to the original issue with Medium as the default priority. Original text and source links are retained.</p>
    <button className="primary" type="button" disabled={busy||!selected.length} onClick={submit}>Import {selected.length} selected issue{selected.length===1?'':'s'}</button>
   </>}
  </Modal>;

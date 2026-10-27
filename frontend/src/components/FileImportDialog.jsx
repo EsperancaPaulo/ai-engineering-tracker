@@ -1,6 +1,7 @@
 import React,{useState} from 'react';
 import {jsonOptions} from '../api.js';
 import {ErrorMessage,Modal} from './Shared.jsx';
+import AutomationPreview from './AutomationPreview.jsx';
 
 const MAX_BYTES=256*1024;
 export default function FileImportDialog({project,api,onClose,onSaved}){
@@ -35,14 +36,14 @@ export default function FileImportDialog({project,api,onClose,onSaved}){
   {preview&&<>
    <div className="file-preview-summary" role="status">Ready: {available.length} · Duplicates: {preview.rows.length-available.length} · Invalid: {preview.errors.length}</div>
    {preview.errors.length>0&&<section className="file-row-errors" aria-label="Rows needing correction"><h3>Rows needing correction</h3><p>These rows cannot be imported. Correct the file and preview again, or select other valid rows.</p><ul>{preview.errors.map(row=><li key={row.row_number}>Row {row.row_number}: {row.message}</li>)}</ul></section>}
-   <p className="field-hint">Select up to {maximum} rows. New tasks start as To do and are assigned to you. Nothing is saved until you confirm.</p>
+   <p className="field-hint">Select up to {maximum} rows. New tasks start as To do. Enabled rules can set priority, assign a member, or add checklist text; otherwise tasks are assigned to you. Nothing is saved until you confirm.</p>
    <button type="button" className="secondary" disabled={busy||!available.length} onClick={()=>setSelected(available.slice(0,maximum).map(row=>row.row_number))}>Select first {Math.min(available.length,maximum)} ready rows</button>
    {selected.length>0&&<button type="button" className="secondary" disabled={busy} onClick={()=>setSelected([])}>Clear selection</button>}
    <div className="file-preview-rows">{preview.rows.map(row=><article className="file-preview-row" key={row.row_number}>
     <label><input type="checkbox" checked={selected.includes(row.row_number)} disabled={busy||Boolean(row.duplicate_reason)||(!selected.includes(row.row_number)&&selected.length>=maximum)} onChange={e=>setSelected(values=>e.target.checked?[...values,row.row_number]:values.filter(number=>number!==row.row_number))}/><span>Row {row.row_number}: {row.title}</span></label>
-    <p className={`priority ${row.priority}`}>{row.priority}</p>
+    <p className={`priority ${row.automation?.priority||row.priority}`}>{row.automation?.priority||row.priority}</p>
     {row.duplicate_reason&&<p className="field-hint">{row.duplicate_reason}</p>}
-    <details><summary>Task details</summary><p>{row.description||'No description provided.'}</p></details>
+    <details><summary>Task details</summary><p>{row.description||'No description provided.'}</p></details><AutomationPreview effect={row.automation} priority={row.priority}/>
    </article>)}</div>
    <p className="field-hint">Identical title, description and priority are skipped. Changed rows create new tasks; existing tasks are never overwritten.</p>
    <button className="primary" type="button" disabled={busy||!selected.length} onClick={submit}>Import {selected.length} selected task{selected.length===1?'':'s'}</button>

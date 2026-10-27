@@ -41,6 +41,8 @@ from github_imports import router as github_router
 app.include_router(github_router)
 from file_imports import router as file_router
 app.include_router(file_router)
+from automation import router as automation_router
+app.include_router(automation_router)
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 app.mount("/assets", StaticFiles(directory=FRONTEND / "assets", check_dir=False), name="assets")
 

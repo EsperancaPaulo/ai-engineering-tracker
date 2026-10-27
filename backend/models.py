@@ -94,3 +94,18 @@ class AppMigration(Base):
     __tablename__ = 'app_migrations'
     version: Mapped[str] = mapped_column(String(80), primary_key=True)
     applied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class AutomationRule(Base):
+    __tablename__ = 'automation_rules'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey('projects.id', ondelete='CASCADE'), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    keyword: Mapped[str] = mapped_column(String(80))
+    match_field: Mapped[str] = mapped_column(String(20), default='title')
+    priority: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    assigned_to: Mapped[int | None] = mapped_column(ForeignKey('users.id'), nullable=True)
+    checklist: Mapped[str] = mapped_column(Text, default='[]')
+    enabled: Mapped[bool] = mapped_column(default=False)
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

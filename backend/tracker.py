@@ -8,7 +8,7 @@ from sqlalchemy import func, select, delete
 from sqlalchemy.exc import IntegrityError
 
 from auth import Database, get_current_user
-from models import ActivityLog, Project, ProjectMember, Task, User
+from models import ActivityLog, Project, ProjectMember, Task, User, AutomationRule
 from schemas import normalize_email
 
 router = APIRouter(prefix='/api', tags=['Tracker'])
@@ -250,6 +250,7 @@ def delete_project(project_id: int, db: Database, user: CurrentUser):
     if db.scalar(select(Task.id).where(Task.project_id == project_id).limit(1)) is not None:
         raise HTTPException(409, 'This project still has tasks. Move or delete them before deleting the project.')
     record(db, user, 'Project deleted', json.dumps({'summary': project.name, 'project_id': project.id, 'before': {'name': project.name, 'description': project.description}}))
+    db.execute(delete(AutomationRule).where(AutomationRule.project_id == project_id))
     db.execute(delete(ProjectMember).where(ProjectMember.project_id == project_id))
     db.delete(project)
     try:
