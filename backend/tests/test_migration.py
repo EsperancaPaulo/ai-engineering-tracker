@@ -59,3 +59,16 @@ def test_automation_migration_adds_empty_storage_without_rewriting_records():
         assert upgrade_automation(connection) is False
         assert connection.scalar(select(func.count()).select_from(AutomationRule))==0
         for model in [User,Project,Task,ActivityLog,ProjectMember]:assert connection.execute(select(model.__table__)).all()==before[model.__tablename__]
+
+
+def test_workflow_migration_preserves_original_records_and_starts_empty():
+    from models import InboxNotice,SlackDelivery,RevokedSession,UserSecurity,EmailGrant
+    from migrate_automation import upgrade as automation_upgrade
+    from migrate_workflows import upgrade as workflow_upgrade
+    engine=legacy_database()
+    with engine.begin() as connection:
+        upgrade(connection);automation_upgrade(connection)
+        before=connection.execute(select(User.__table__)).all()
+        assert workflow_upgrade(connection) is True and workflow_upgrade(connection) is False
+        assert connection.execute(select(User.__table__)).all()==before
+        for model in (InboxNotice,SlackDelivery,RevokedSession,UserSecurity,EmailGrant):assert connection.scalar(select(func.count()).select_from(model))==0

@@ -1,5 +1,6 @@
 """Read public GitHub issues; import only owner-approved signed previews. Never write to GitHub."""
 import json
+import os
 import re
 from datetime import datetime,timedelta,timezone
 from typing import Annotated, Literal
@@ -70,6 +71,7 @@ def ai_configuration(project_id:int,db:Database,user:CurrentUser):
 def analyze(project_id:int,data:AnalyzeInput,db:Database,user:CurrentUser):
     project_access(db,user,project_id,owner_only=True)
     claims=decode_preview(data.preview_token.get_secret_value(),user.id,project_id)
+    if claims.get('restricted_source'):raise HTTPException(403,'Restricted repository content is not sent to AI. Original import is available.')
     issues={issue['number']:issue for issue in claims['issues']}
     selected=list(dict.fromkeys(data.issue_numbers))
     if any(number not in issues for number in selected):raise HTTPException(422,'Select issues from this preview.')
@@ -85,11 +87,18 @@ def analyze(project_id:int,data:AnalyzeInput,db:Database,user:CurrentUser):
     return {'preview_token':token,'issues':updated}
 
 
-def fetch_issues(repository,page):
+def private_credential(repository,project_id):
+    allowed={value.strip().lower() for value in os.getenv('GITHUB_ALLOWED_REPOSITORIES','').split(',') if value.strip()}
+    if os.getenv('GITHUB_PROJECT_ID','')==str(project_id) and repository.lower() in allowed:
+        return os.getenv('GITHUB_READ_TOKEN','').strip() or None
+    return None
+
+
+def fetch_issues(repository,page,credential=None):
     for attempt in range(2):
         try:
             with httpx.Client(timeout=httpx.Timeout(10,connect=4),follow_redirects=False,trust_env=False) as client:
-                response=client.get(f'https://api.github.com/repos/{repository}/issues',params={'state':'open','per_page':20,'page':page,'sort':'created','direction':'desc'},headers={'Accept':'application/vnd.github+json','User-Agent':'AI-Engineering-Tracker'})
+                response=client.get(f'https://api.github.com/repos/{repository}/issues',params={'state':'open','per_page':20,'page':page,'sort':'created','direction':'desc'},headers={'Accept':'application/vnd.github+json','User-Agent':'AI-Engineering-Tracker',**({'Authorization':'Bearer '+credential} if credential else {})})
         except httpx.HTTPError:
             if attempt==0:continue
             raise HTTPException(502,'GitHub could not be reached. Please retry the preview.') from None
@@ -128,16 +137,17 @@ def imported_ids(db,project_id):
 @router.post('/{project_id}/github/preview')
 def preview(project_id:int,data:PreviewInput,db:Database,user:CurrentUser):
     project_access(db,user,project_id,owner_only=True)
-    issues,next_page=fetch_issues(data.repository,data.page)
+    credential=private_credential(data.repository,project_id)
+    issues,next_page=fetch_issues(data.repository,data.page,credential) if credential else fetch_issues(data.repository,data.page)
     active_rules=automation.rule_set(db,project_id)
     issues=[{**issue,'automation':automation.effects(db,project_id,active_rules,issue['title'],issue['body']+'\n\nSource: '+issue['url'])} for issue in issues]
     existing=imported_ids(db,project_id)
     now=datetime.now(timezone.utc)
     token=jwt.encode({'iss':PREVIEW_ISSUER,'sub':str(user.id),'aud':str(project_id),'iat':now,'exp':now+timedelta(minutes=5),
-                      'repository':data.repository,'issues':issues,'rule_digest':automation.digest(active_rules)},SECRET_KEY,algorithm=ALGORITHM)
+                      'repository':data.repository,'issues':issues,'rule_digest':automation.digest(active_rules),'restricted_source':bool(credential)},SECRET_KEY,algorithm=ALGORITHM)
     return {'repository':data.repository,'page':data.page,'has_next':next_page,'preview_token':token,
             'issues':[{**issue,'already_imported':issue['id'] in existing} for issue in issues],
-            'ai':ai_suggestions.public_settings()}
+            'ai':{**ai_suggestions.public_settings(),'ready':False} if credential else ai_suggestions.public_settings(),'restricted_source':bool(credential)}
 
 
 @router.post('/{project_id}/github/import')

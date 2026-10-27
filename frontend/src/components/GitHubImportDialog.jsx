@@ -33,13 +33,14 @@ export default function GitHubImportDialog({project,api,onClose,onSaved}){
   if(!checked)setAccepted(values=>values.filter(value=>value!==number));
  }
  return <Modal title="Import GitHub issues" titleId="github-title" onClose={onClose}>
-  <p className="subtle">Import open issues from a public repository into {project.name}. GitHub is read-only; you choose what to save here.</p>
+  <p className="subtle">Import open issues into {project.name}. GitHub is read-only; you choose what to save here.</p>
   <form onSubmit={event=>{event.preventDefault();load();}}>
-   <label htmlFor="github-repository">Public repository</label>
+   <label htmlFor="github-repository">Repository</label>
    <input id="github-repository" value={repository} onChange={e=>{setRepository(e.target.value);setPreview(null);setSelected([]);setAccepted([]);}} placeholder="owner/repository" maxLength={140} required disabled={busy}/>
    <button type="submit" className="secondary" disabled={busy}>{busy?'Working…':'Preview issues'}</button>
   </form><ErrorMessage message={error}/>
   {preview&&<>
+   {preview.restricted_source&&<p className="automation-result">Restricted repository source: imported text becomes visible to this project’s members. AI is disabled for this source.</p>}
    <p className="field-hint">Page {preview.page}. Select up to 10 issues. Imported tasks start as To do. Enabled rules may set priority, assignee and checklist; otherwise they are assigned to you. Nothing is saved as a task until you confirm.</p>
    {preview.issues.length>0&&<section className="ai-import-help" aria-label="AI assistance">
     <h3>Optional AI assistance</h3>

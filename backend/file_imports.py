@@ -1,5 +1,8 @@
 """Bounded CSV task imports with owner review, signed snapshots, and replay protection."""
 import csv
+from email import policy as email_policy
+from email.parser import BytesParser
+from html.parser import HTMLParser
 import hashlib
 import io
 import json
@@ -84,6 +87,40 @@ def parse_csv(raw):
         raise HTTPException(422, 'CSV could not be read. Check commas and quoted fields, or use the template.') from None
 
 
+class PlainHTML(HTMLParser):
+    def __init__(self):super().__init__();self.parts=[];self.hidden=0
+    def handle_starttag(self,tag,attrs):
+        if tag in ('script','style','head'):self.hidden+=1
+        if tag in ('p','br','div','li'):self.parts.append('\n')
+    def handle_endtag(self,tag):
+        if tag in ('script','style','head') and self.hidden:self.hidden-=1
+    def handle_data(self,data):
+        if not self.hidden:self.parts.append(data)
+
+
+def parse_email(raw):
+    if not raw or len(raw)>MAX_BYTES:raise HTTPException(413,'Choose an email file no larger than 256 KB.')
+    try:
+        message=BytesParser(policy=email_policy.default).parsebytes(raw)
+        if message.defects:raise ValueError()
+        title=' '.join(str(message.get('Subject','')).split())
+        if not title or len(title)>200 or any(ord(char)<32 for char in title):raise ValueError()
+        part=message.get_body(preferencelist=('plain','html'))
+        if part is None or part.get_content_disposition()=='attachment':raise ValueError()
+        body=part.get_content()
+        if not isinstance(body,str):raise ValueError()
+        if part.get_content_type()=='text/html':
+            parser=PlainHTML();parser.feed(body);body=''.join(parser.parts)
+        body=body.replace('\r\n','\n').replace('\r','\n').strip()
+        if not body or len(body)>7800 or any(ord(char)<32 and char not in '\n\t' for char in body):raise ValueError()
+        row={'row_number':2,'title':title,'description':body,'priority':'medium'}
+        row['fingerprint']=fingerprint(row)
+        return [row],[]
+    except (ValueError,TypeError,LookupError,AttributeError):
+        raise HTTPException(422,'Email could not be imported. Use an .eml file with a subject up to 200 characters and readable message text up to 7,800 characters. Attachments are not imported.') from None
+
+
+
 def existing_fingerprints(db, project_id):
     fingerprints = set()
     for details in db.scalars(select(ActivityLog.details).where(ActivityLog.action == 'File task imported')):
@@ -107,8 +144,9 @@ def download_template():
 @router.post('/projects/{project_id}/files/preview')
 async def preview(project_id: int, request: Request, db: Database, user: CurrentUser):
     project_access(db, user, project_id, owner_only=True)
-    if request.headers.get('content-type', '').split(';')[0].strip().lower() != 'text/csv':
-        raise HTTPException(415, 'Choose a CSV UTF-8 file.')
+    content_type=request.headers.get('content-type','').split(';')[0].strip().lower()
+    if content_type not in ('text/csv','message/rfc822'):
+        raise HTTPException(415,'Choose a CSV UTF-8 or .eml email file.')
     user_id = user.id
     db.rollback()
     raw = bytearray()
@@ -116,7 +154,8 @@ async def preview(project_id: int, request: Request, db: Database, user: Current
         if len(raw)+len(chunk) > MAX_BYTES:
             raise HTTPException(413, 'Choose a CSV file no larger than 256 KB.')
         raw.extend(chunk)
-    rows, errors = parse_csv(bytes(raw))
+    source='email' if content_type=='message/rfc822' else 'csv'
+    rows, errors = parse_email(bytes(raw)) if source=='email' else parse_csv(bytes(raw))
     project_access(db, user, project_id, owner_only=True)
     active_rules = automation.rule_set(db, project_id)
     for row in rows:
@@ -129,8 +168,8 @@ async def preview(project_id: int, request: Request, db: Database, user: Current
         output.append({**row, 'duplicate_reason': duplicate})
         seen.add(row['fingerprint'])
     now = datetime.now(timezone.utc)
-    token = jwt.encode({'iss': PREVIEW_ISSUER, 'sub': str(user_id), 'aud': str(project_id), 'iat': now, 'exp': now+timedelta(minutes=5), 'rows': rows, 'rule_digest': automation.digest(active_rules)}, SECRET_KEY, algorithm=ALGORITHM)
-    return {'preview_token': token, 'rows': output, 'errors': errors, 'maximum_selection': MAX_SELECTION}
+    token = jwt.encode({'iss': PREVIEW_ISSUER, 'sub': str(user_id), 'aud': str(project_id), 'iat': now, 'exp': now+timedelta(minutes=5), 'rows': rows, 'rule_digest': automation.digest(active_rules), 'source':source}, SECRET_KEY, algorithm=ALGORITHM)
+    return {'preview_token': token, 'rows': output, 'errors': errors, 'maximum_selection': MAX_SELECTION, 'source':source}
 
 
 @router.post('/projects/{project_id}/files/import')
@@ -157,8 +196,8 @@ def import_selected(project_id: int, data: ImportSelection, db: Database, user: 
         task = Task(title=row['title'], description=row['description'], priority=row['priority'], status='todo', assigned_to=user.id, project_id=project_id)
         db.add(task)
         db.flush()
-        automation.apply(db, user, project_id, task, row.get('automation'), 'csv')
-        record(db, user, 'File task imported', json.dumps({'summary': f"CSV row {number}: {row['title']}", 'project_id': project_id, 'task_id': task.id, 'row_number': number, 'fingerprint': row['fingerprint']}))
+        automation.apply(db, user, project_id, task, row.get('automation'), claims.get('source','csv'))
+        record(db, user, 'File task imported', json.dumps({'summary': f"{claims.get('source','csv').upper()} row {number}: {row['title']}", 'source':claims.get('source','csv'), 'project_id': project_id, 'task_id': task.id, 'row_number': number, 'fingerprint': row['fingerprint']}))
         existing.add(row['fingerprint'])
         created.append(task.id)
     db.commit()

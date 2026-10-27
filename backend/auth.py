@@ -1,17 +1,18 @@
 import os
+import hashlib,secrets
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pwdlib import PasswordHash
-from sqlalchemy import func, select
+from sqlalchemy import func, select, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
-from models import User
+from models import User, RevokedSession, UserSecurity
 from schemas import PublicUser, Registration, Token, normalize_email
 from human_verification import require_human, public_settings
 from password_policy import POLICY
@@ -43,9 +44,9 @@ def unauthorized():
     return HTTPException(status_code=401, detail="Invalid credentials or token", headers={"WWW-Authenticate": "Bearer"})
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, version: int=0) -> str:
     now = datetime.now(timezone.utc)
-    return jwt.encode({"sub": str(user_id), "iat": now, "exp": now + timedelta(minutes=TOKEN_MINUTES), "iss": ISSUER}, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode({"sub": str(user_id), "iat": now, "exp": now + timedelta(minutes=TOKEN_MINUTES), "iss": ISSUER, "jti":secrets.token_urlsafe(24), "ver":version}, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Database):
@@ -59,9 +60,13 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Database
             raise unauthorized()
     except (jwt.InvalidTokenError, ValueError, TypeError):
         raise unauthorized() from None
+    if db.get(RevokedSession,hashlib.sha256(token.encode()).hexdigest()) is not None:
+        raise unauthorized()
     user = db.get(User, user_id)
     if user is None:
         raise unauthorized()
+    security=db.get(UserSecurity,user.id)
+    if claims.get("ver",0)!=(security.session_version if security else 0):raise unauthorized()
     return user
 
 
@@ -82,17 +87,22 @@ def register(data: Registration, db: Database, human=Depends(require_human)):
 
 
 @router.post("/auth/login", response_model=Token)
-def login(response: Response, form: Annotated[OAuth2PasswordRequestForm, Depends()], db: Database):
+def login(request:Request,response: Response, form: Annotated[OAuth2PasswordRequestForm, Depends()], db: Database):
+    from account_email import limit
+    limit('login:'+str(request.client.host if request.client else 'unknown'),20,60)
     # OAuth2 calls the email field 'username'. Bound work before database/hash operations.
     if len(form.username) > 255 or not 1 <= len(form.password) <= 128:
         raise unauthorized()
-    user = db.scalar(select(User).where(func.lower(User.email) == normalize_email(form.username)))
+    user = db.scalar(select(User).where(func.lower(User.email) == normalize_email(form.username)).with_for_update())
     valid = password_hasher.verify(form.password, user.password_hash if user else DUMMY_HASH)
     if user is None or not valid:
         raise unauthorized()
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
-    return Token(access_token=create_access_token(user.id), expires_in=TOKEN_MINUTES * 60)
+    security=db.get(UserSecurity,user.id)
+    if os.getenv('REQUIRE_VERIFIED_EMAIL','false').lower()=='true' and not (security and security.email_verified_at):
+        raise HTTPException(403,'Verify your email before signing in. Use Forgot password, then choose Email verification to request a link.')
+    return Token(access_token=create_access_token(user.id,security.session_version if security else 0), expires_in=TOKEN_MINUTES * 60)
 
 
 @router.get("/me", response_model=PublicUser)
@@ -104,3 +114,13 @@ def me(response: Response, user: Annotated[User, Depends(get_current_user)]):
 @router.get('/auth/config')
 def registration_config():
     return {'password_policy': POLICY, 'human_verification': public_settings()}
+
+
+@router.post('/auth/logout',status_code=204)
+def logout(token:Annotated[str,Depends(oauth2_scheme)],user:Annotated[User,Depends(get_current_user)],db:Database):
+    claims=jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM],issuer=ISSUER)
+    db.execute(delete(RevokedSession).where(RevokedSession.expires_at<datetime.now(timezone.utc)))
+    db.add(RevokedSession(token_digest=hashlib.sha256(token.encode()).hexdigest(),expires_at=datetime.fromtimestamp(claims['exp'],timezone.utc)))
+    try:db.commit()
+    except IntegrityError:db.rollback()
+    return Response(status_code=204)

@@ -17,7 +17,7 @@ private_values = []
 for file in [ROOT / '.env', ROOT / 'backend/.env']:
     if file.exists():
         values = dotenv_values(file)
-        private_values.extend(value.encode() for key,value in values.items() if value and len(value) >= 8 and re.search(r'SECRET|PASSWORD|TOKEN|PRIVATE_KEY|DATABASE_URL|API_KEY',key,re.I))
+        private_values.extend(value.encode() for key,value in values.items() if value and len(value) >= 8 and re.search(r'SECRET|PASSWORD|TOKEN|PRIVATE_KEY|DATABASE_URL|API_KEY|WEBHOOK',key,re.I))
         url = values.get('DATABASE_URL')
         if url:
             password = urlsplit(url).password
@@ -31,6 +31,7 @@ patterns = [
     rb'sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{30,}',
     rb'AKIA[A-Z0-9]{16}',
     rb'xox[baprs]-[A-Za-z0-9-]{20,}',
+    rb'https://hooks[.]slack[.]com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[A-Za-z0-9]{20,}',
     rb'AIza[0-9A-Za-z_-]{30,}',
     rb'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}',
 ]

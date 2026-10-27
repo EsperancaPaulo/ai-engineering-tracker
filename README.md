@@ -1,6 +1,6 @@
 # AI Engineering Tracker
 
-A local engineering workspace with FastAPI, PostgreSQL, secure sign-in, project teams, tasks, progress and activity history. The interface uses React with Vite, served by FastAPI. Owners can preview and import public GitHub issues or CSV task lists. Optional AI drafts can summarize selected public issues and suggest priorities for owner review. Private GitHub connections and Slack remain on the [roadmap](ROADMAP.md).
+A local engineering workspace with FastAPI, PostgreSQL, secure sign-in, project teams, tasks, progress and activity history. The interface uses React with Vite, served by FastAPI. Owners can preview and import public GitHub issues or CSV task lists. Optional AI drafts can summarize selected public issues and suggest priorities for owner review. Saved-email imports, private assignment notifications, reports, and optional reviewed Slack updates are also available. See [service setup](SERVICE_SETUP.md) and the [roadmap](ROADMAP.md) for connection and launch limits.
 
 ## Setup
 
@@ -42,6 +42,7 @@ Back up an existing database before migrating. From `backend`, apply the version
 ```sh
 python migrate.py
 python migrate_automation.py
+python migrate_workflows.py
 uvicorn main:app --reload
 ```
 
@@ -76,7 +77,7 @@ python migrate.py --legacy-owner-id USER_ID
 
 Users present at migration keep Editor access to old shared projects, except the selected Owner. Later accounts are not automatically added. New projects are private until members are added. Do not select a legacy owner without authorization.
 
-Create a private PostgreSQL backup before applying this update. Migration and preservation have been checked against isolated SQLite and temporary PostgreSQL fixtures; those checks do not replace a backup of real data. Store backups outside Git with restricted file access. For recovery, stop the app and first restore the backup into a separate database; verify its contents before changing `DATABASE_URL`. Do not automatically drop membership tables as a downgrade: that loses access configuration. Backup retention, off-device storage and a full operational restore drill remain pending.
+Create a private PostgreSQL backup before applying this update. Migration and preservation have been checked against isolated SQLite and temporary PostgreSQL fixtures; those checks do not replace a backup of real data. Store backups outside Git with restricted file access. For recovery, stop the app and first restore the backup into a separate database; verify its contents before changing `DATABASE_URL`. Do not automatically drop membership tables as a downgrade: that loses access configuration. The private backup utility and isolated full restore drill are documented in SERVICE_SETUP.md; off-device storage still requires operator setup.
 
 ## API
 
@@ -116,7 +117,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The frontend has 36 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 139 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; this migration changes no database schema or records.
+The frontend has 39 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 154 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; migration 003 adds five empty workflow/security tables; original records and permissions are preserved.
 
 Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
 
@@ -124,9 +125,9 @@ Dependencies are bounded in `requirements.txt`; development tools in `requiremen
 
 ## Security and publication
 
-Passwords are stored as Argon2id hashes. Profile/validation responses omit submitted passwords and hashes. JWT verification requires the expected issuer, algorithm and expiration. Browser tokens stay in memory; refresh requires sign-in. Sign out clears this browser's token, not a copied token. The orbit animation supports pause and reduced-motion preferences. Optional Google Fonts have local fallbacks.
+Passwords are stored as Argon2id hashes. Profile/validation responses omit submitted passwords and hashes. JWT verification requires the expected issuer, algorithm and expiration. Browser tokens stay in memory; refresh requires sign-in. Sign out revokes the submitted token server-side and clears this browser; password reset invalidates all prior sessions. The orbit animation supports pause and reduced-motion preferences. Optional Google Fonts have local fallbacks.
 
-Before public hosting, add HTTPS, rate limiting, email verification/recovery, session revocation, production secrets and backup/restore procedures. Registration reports duplicate emails. Lists need pagination for large datasets. Project writes serialize with membership changes; broader conflict handling remains future work. AI requests require explicit configuration and an owner action; external notifications remain inactive. Read [SECURITY.md](SECURITY.md) and run the staged-file secret check before publishing source. Keep real `.env`, backups, logs, uploads and database files private.
+Before public hosting, complete HTTPS, shared durable rate limits, real email delivery acceptance, production secrets and off-device backup operations. Registration reports duplicate emails. Lists need pagination for large datasets. Project writes serialize with membership changes; broader conflict handling remains future work. AI requests require explicit configuration and an owner action; external delivery stays disabled until configured and explicitly approved. Read [SECURITY.md](SECURITY.md) and run the staged-file secret check before publishing source. Keep real `.env`, backups, logs, uploads and database files private.
 
 ## Development workflow
 
@@ -153,7 +154,7 @@ Registration fails closed when configuration is missing or verification is unava
 
 As project Owner, choose **Import issues**, enter `owner/repository`, and preview open issues. Previewing saves nothing. Review details and source links, select up to 10 issues, then confirm import. Imported tasks start as To do with Medium priority and your assignment by default; enabled import rules can change priority/assignee and add checklist text as shown in preview. The original text and source link are retained. Repeated imports of the same issue into that project are skipped. Deleted imported tasks are still recorded as previously imported.
 
-This uses public GitHub data without credentials and never changes GitHub. Pull requests are excluded. Previews expire after five minutes and are bound to the owner and project. Private repositories, OAuth and automatic synchronization are future work. Optional reviewed AI drafts are described below. Requests have timeouts, one bounded retry for transient failures, and rate-limit feedback. No schema migration is required for this update; provenance is stored in existing activity records.
+This uses public GitHub data without credentials and never changes GitHub. Pull requests are excluded. Previews expire after five minutes and are bound to the owner and project. Private repositories can use a backend-only, project-bound and repository-allowlisted credential; see SERVICE_SETUP.md. OAuth and automatic synchronization remain future work. Optional reviewed AI drafts are described below. Requests have timeouts, one bounded retry for transient failures, and rate-limit feedback. No schema migration is required for this update; provenance is stored in existing activity records.
 
 ## Optional AI drafts with owner approval
 

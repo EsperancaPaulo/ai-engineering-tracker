@@ -43,6 +43,10 @@ from file_imports import router as file_router
 app.include_router(file_router)
 from automation import router as automation_router
 app.include_router(automation_router)
+from workflows import router as workflows_router
+app.include_router(workflows_router)
+from account_email import router as account_email_router
+app.include_router(account_email_router)
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 app.mount("/assets", StaticFiles(directory=FRONTEND / "assets", check_dir=False), name="assets")
 
