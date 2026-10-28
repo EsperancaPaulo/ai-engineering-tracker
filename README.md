@@ -43,6 +43,7 @@ Back up an existing database before migrating. From `backend`, apply the version
 python migrate.py
 python migrate_automation.py
 python migrate_workflows.py
+python migrate_gmail.py
 uvicorn main:app --reload
 ```
 
@@ -117,7 +118,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The frontend has 41 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 167 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; migration 003 adds five empty workflow/security tables; original records and permissions are preserved.
+The frontend has 44 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 181 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; migration 003 adds five empty workflow/security tables; original records and permissions are preserved.
 
 Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
 
@@ -214,3 +215,11 @@ For an exported spreadsheet with headings such as Summary, Notes and Importance,
 Preview and review the actual rows before selecting/importing. Changes to mappings discard the previous review; changing files clears mapping choices. Mappings are per-file and are not persisted as presets. Status/assignee columns cannot alter permissions or bypass rules. Duplicate fingerprints use the resulting title/details/priority, so mapping and canonical-column imports of identical tasks cannot silently duplicate one another. No AI or schema migration is needed.
 
 `POST /api/projects/{id}/files/columns` accepts bounded raw CSV and returns headings/positions only, owner-only and read-only. Preview can receive an `X-CSV-Mapping` JSON header mapping title/description/priority to distinct zero-based column indexes; unsupported keys and invalid indexes are rejected. The raw upload remains bounded and no original file is stored.
+
+## Gmail review queue (local connection)
+
+Migration 004 adds empty `gmail_sources` and `gmail_drafts` storage. Connect with the private Desktop OAuth helper described in SERVICE_SETUP.md. Only an existing project Owner can bind the mailbox; the human completes Google's read-only consent. Credentials stay in owner-only `.private/` files outside public source; no frontend secret upload is provided. Google read-only permission covers the mailbox broadly even though the app collects only the exact Tracker Inbox label. Test with harmless mail first.
+
+Use Gmail drafts on the project card → Collect labelled emails → select up to ten drafts → Review → Confirm & import. Collection saves private owner-only drafts, not tasks; importing shares task details with project members. Existing rules apply in the final reviewed preview, and changes invalidate stale approvals. Attachments/images are not opened, no AI is called, and mail is never sent/modified. Dismiss/restore is available. Identical content from CSV/manual/file imports is skipped, and permanent message receipts prevent reimporting processed/deleted tasks. Processed queue bodies are cleared; pending/dismissed bodies remain private local database data.
+
+Collection scans five messages per page, retains its page cursor durably, limits pending drafts to 100, throttles successful polls to once a minute and backs off failed polls up to one hour. Invalid/oversized messages are blocked with a safe reason. There is no unlimited retry loop in a request. A separate optional local `scripts/gmail_worker.py` process polls only projects explicitly enabled in the UI. It must remain running; this is not an installed operating-system service or public hosting. Stopping the worker or pausing the source stops future polling after current work finishes. Imported tasks always need owner confirmation.

@@ -154,3 +154,29 @@ class EmailGrant(Base):
     kind: Mapped[str] = mapped_column(String(20))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),index=True)
     consumed: Mapped[bool] = mapped_column(default=False)
+
+
+class GmailSource(Base):
+    __tablename__ = 'gmail_sources'
+    project_id: Mapped[int] = mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    account_key: Mapped[str] = mapped_column(String(64))
+    label_id: Mapped[str] = mapped_column(String(200))
+    cursor: Mapped[str | None] = mapped_column(Text,nullable=True)
+    automatic: Mapped[bool] = mapped_column(default=False)
+    next_poll: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),nullable=True)
+    failures: Mapped[int] = mapped_column(default=0)
+    last_result: Mapped[str] = mapped_column(String(200),default='Connected; no collection yet.')
+
+
+class GmailDraft(Base):
+    __tablename__ = 'gmail_drafts'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),index=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    message_key: Mapped[str] = mapped_column(String(64),unique=True)
+    title: Mapped[str] = mapped_column(String(200),default='')
+    description: Mapped[str] = mapped_column(Text,default='')
+    state: Mapped[str] = mapped_column(String(20),default='pending')
+    problem: Mapped[str] = mapped_column(String(300),default='')
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utc_now)

@@ -10,6 +10,7 @@ import DeleteDialog from './DeleteDialog.jsx';
 import ProjectReportDialog from './ProjectReportDialog.jsx';
 import InboxDialog from './InboxDialog.jsx';
 import AccountDialog from './AccountDialog.jsx';
+import GmailDialog from './GmailDialog.jsx';
 
 const emptyData = {projects: [], tasks: [], teamTasks: [], activity: []};
 const titles = {
@@ -67,6 +68,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
               {project.role === 'owner' && <Action label={`Delete project ${project.name}`} onClick={() => setDialog({type:'delete',mode:'project',item:project})}>Delete</Action>}
               {project.role === 'owner' && <Action label={`Import GitHub issues into ${project.name}`} onClick={() => setDialog({type:'github',project})}>Import issues</Action>}
               {project.role === 'owner' && <Action label={`Import file tasks into ${project.name}`} onClick={() => setDialog({type:'file',project})}>Import file</Action>}
+              {project.role === 'owner' && <Action label={`Review Gmail drafts for ${project.name}`} onClick={() => setDialog({type:'gmail',project})}>Gmail drafts</Action>}
               {project.role === 'owner' && <Action label={`Manage automation rules for ${project.name}`} onClick={() => setDialog({type:'rules',project})}>Rules</Action>}
               <Action label={`View report for ${project.name}`} onClick={()=>setDialog({type:'report',project})}>Report & updates</Action>
               <Action label={`View team for ${project.name}`} onClick={() => setDialog({type:'team',project})}>Team</Action>
@@ -84,6 +86,7 @@ export default function Workspace({user, api, onSignOut, notify}) {
     {dialog?.type === 'item' && <ItemDialog key={`${dialog.mode}-${dialog.item?.id || 'new'}`} {...dialog} initialProjectId={dialog.projectId} projects={projects} user={user} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'github' && <GitHubImportDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'file' && <FileImportDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
+    {dialog?.type === 'gmail' && <GmailDialog project={dialog.project} api={api} onClose={()=>setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'rules' && <AutomationRulesDialog project={dialog.project} api={api} onClose={() => setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'report' && <ProjectReportDialog project={dialog.project} api={api} onClose={()=>setDialog(null)} onSaved={saved}/>}
     {dialog?.type === 'inbox' && <InboxDialog api={api} onClose={()=>setDialog(null)}/>}

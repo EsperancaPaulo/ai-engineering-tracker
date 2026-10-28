@@ -28,3 +28,8 @@ dumps/
 backups/
 work/
 outputs/
+
+# Local Gmail OAuth client and refresh credentials
+.private/
+client_secret*.json
+token*.json

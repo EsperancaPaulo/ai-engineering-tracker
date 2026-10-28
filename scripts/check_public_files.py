@@ -36,7 +36,7 @@ patterns = [
     rb'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}',
 ]
 compiled = [re.compile(pattern) for pattern in patterns]
-blocked_parts = {'.venv', 'node_modules', '__pycache__', '.pytest_cache', 'work', 'outputs', 'uploads', 'dumps', 'backups'}
+blocked_parts = {'.venv', 'node_modules', '__pycache__', '.pytest_cache', 'work', 'outputs', 'uploads', 'dumps', 'backups', '.private'}
 blocked_suffixes = {'.db', '.sqlite', '.sqlite3', '.dump', '.backup', '.log', '.pem', '.key', '.p12', '.pfx', '.pyc'}
 failures = []
 entries = [entry for entry in git('ls-files', '--stage', '-z').split(b'\0') if entry]
@@ -55,6 +55,8 @@ for entry in entries:
         failures.append((path, 'private/runtime file'))
         continue
     data = git('show', ':' + path)
+    if re.search(rb'"(?:refresh_token|client_secret)"\s*:\s*"[^"]{12,}"', data):
+        failures.append((path, 'OAuth credential-like JSON'))
     if any(value in data for value in private_values):
         failures.append((path, 'matches a local secret'))
     if any(pattern.search(data) for pattern in compiled):
