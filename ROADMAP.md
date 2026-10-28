@@ -116,3 +116,9 @@ Remaining non-AI work: choose/configure the email provider; automatic mailbox co
 ## Flexible CSV mapping milestone
 
 Owner-reviewed per-file column mapping now accepts existing spreadsheet headings, explicitly ignores unrelated columns and preserves validation, rule actions, role checks and canonical duplicate fingerprints. Header inspection is read-only and bounded. Mapping changes clear previous previews; saved presets/value translations remain future work. No database migration or paid service is needed. Verification: 167 backend and 41 frontend tests plus isolated browser acceptance. Gmail/Google Workspace is selected; outgoing SMTP instructions are documented, while incoming OAuth/queue implementation and live service acceptance remain pending.
+
+## Gmail draft collection milestone
+
+Implemented local Desktop OAuth connection with human consent, project/owner/mailbox binding, fixed Tracker Inbox filtering, a durable paged owner-only review queue, explicit rule-aware import approval, persistent source receipts, dismiss/restore, bounded polling and durable backoff. Optional automatic draft polling requires both owner opt-in and a running local worker; it never creates tasks without review. Migration 004 is additive. Current checks: 181 backend/44 frontend tests and sample-message browser acceptance. Real Google OAuth/labelled collection awaits human consent; SMTP verification and password recovery were separately reported passing.
+
+Remaining: real Gmail acceptance, public OAuth verification/production hosting, installed worker supervision, retention operations, live Slack/private-GitHub acceptance and controlled background notification rules/direct recipients; durable usage measures and broader list pagination; production shared rate limits/off-device backups; real team feedback. AI remains implemented with paid live acceptance pending credits.

@@ -127,3 +127,14 @@ This is a milestone checklist. Full-system acceptance will follow the remaining 
 5. Viewers, Editors and nonmembers cannot inspect columns or preview/import files. Email imports continue without CSV mapping controls.
 
 Current automated verification: 167 backend and 41 frontend tests.
+
+## Gmail connection acceptance (human permission required)
+
+1. Complete the local Desktop OAuth flow yourself using the intended test mailbox. Read the permission notice; the app requests read-only access, not sending/modification. No message should be collected merely by connecting.
+2. On your owned project, open Gmail drafts and Collect labelled emails. Only Tracker Inbox messages should appear, with no tasks created yet. Unlabelled mail must remain absent. Attachments/images are ignored; oversized/unsupported mail is blocked.
+3. Select a harmless draft, Review, inspect rule effects, then confirm import. Check title/details/priority/assignment. Collect again after the interval: it must not recreate processed mail. Existing identical tasks are skipped.
+4. Dismiss a pending draft, switch to Dismissed drafts and restore it. Only the owner can view source drafts; Editors/Viewers cannot open this queue even though they can read imported tasks.
+5. Enable automatic collection only after manual acceptance, run the optional local worker and label a new sample message. A draft should appear on Refresh, without automatically creating a task. Pause the source or stop the worker and confirm future polls stop. Wait longer after service failures; do not repeatedly force requests.
+6. Revoking Google consent should produce a safe reconnect/wait state without exposing tokens or importing fake messages. Keep credential files, consent URLs and mailbox content private.
+
+Automated validation: 181 backend and 44 frontend tests, including mocked OAuth state/PKCE, private token refresh, role/project isolation, durable backoff/cursor, review approval, deduplication, restore, migration and safe errors. Browser acceptance uses sample messages, not a real mailbox. Real connection/collection remains pending human consent. Full-system acceptance is still separate from this milestone.
