@@ -4,6 +4,8 @@ Preserve existing `backend/.env`; add settings from `.env.example` privately. Ne
 
 ## Slack: one project, one test channel
 
+If you do not have a workspace yet, open https://slack.com/get-started#/createnew, sign in with email or Google, complete email confirmation yourself and follow Create a Workspace. Use AI Engineering Tracker as the workspace name for local testing. Choose the Free plan when offered; no paid upgrade is needed for this single-app test. Skip teammate invitations until you intend to invite actual people. Then create a dedicated tracker-test channel before adding the app/webhook below. You must review any signup terms yourself. Official creation guide: https://slack.com/help/articles/206845317-Create-a-Slack-workspace ; plan details: https://slack.com/pricing/free
+
 1. At https://api.slack.com/apps create an app From scratch in your workspace.
 2. Enable Incoming Webhooks, choose Add New Webhook to Workspace, and select a dedicated test channel. Complete authorization yourself.
 3. Save its secret URL as `SLACK_WEBHOOK_URL` privately. Set `SLACK_CHANNEL_LABEL` to the actual channel name, and `SLACK_PROJECT_ID` to the project number shown in Report & updates.
@@ -85,4 +87,4 @@ Keep it running. Closing/stopping that process stops polling; the UI toggle alon
 
 Official OAuth guide: https://developers.google.com/identity/protocols/oauth2/native-app
 
-Local tests mock Google and use a sample-message browser demo. Real OAuth and real labelled-message collection remain unverified until the human completes the connection and acceptance checks. Gmail SMTP verification and password-reset delivery were separately reported passing by the human tester.
+Automated tests mock Google and the development browser demo uses sample messages. On 2026-10-28, the human completed live local OAuth, confirmed labelled-message collection and reported reviewed import/repeat-collection and automatic collection/pause checks complete. Gmail SMTP verification and password-reset delivery were separately reported passing. Production verification, always-on worker supervision and live revocation/failure acceptance remain separate.

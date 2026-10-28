@@ -114,7 +114,7 @@ Assign a new task to another Editor; their Notifications should show it, with no
 
 Forgot password and email verification require configured TLS SMTP. After private setup, the human tester requests a link to their own mailbox and completes it. Links expire after 30 minutes and work once. Strong password checks apply to resets; resetting invalidates older sessions. Existing sign-in remains available while verification enforcement is off.
 
-Slack preview is separate from sending. Before any live test, verify the bound project/channel, review the exact text, and explicitly enable sending privately. Check one approved update arrives once. A failed/uncertain attempt must not automatically retry; check the channel first. Automated tests mock external delivery. Real Slack/email/private-GitHub acceptance is pending service setup.
+Slack preview is separate from sending. Before any live test, verify the bound project/channel, review the exact text, and explicitly enable sending privately. Check one approved update arrives once. A failed/uncertain attempt must not automatically retry; check the channel first. Automated tests mock external delivery. Real Slack/private-GitHub acceptance is pending service setup; Gmail outgoing delivery was subsequently reported passing.
 
 This is a milestone checklist. Full-system acceptance will follow the remaining non-AI workflows and service decisions; paid AI checks remain separate.
 
@@ -137,4 +137,10 @@ Current automated verification: 167 backend and 41 frontend tests.
 5. Enable automatic collection only after manual acceptance, run the optional local worker and label a new sample message. A draft should appear on Refresh, without automatically creating a task. Pause the source or stop the worker and confirm future polls stop. Wait longer after service failures; do not repeatedly force requests.
 6. Revoking Google consent should produce a safe reconnect/wait state without exposing tokens or importing fake messages. Keep credential files, consent URLs and mailbox content private.
 
-Automated validation: 181 backend and 44 frontend tests, including mocked OAuth state/PKCE, private token refresh, role/project isolation, durable backoff/cursor, review approval, deduplication, restore, migration and safe errors. Browser acceptance uses sample messages, not a real mailbox. Real connection/collection remains pending human consent. Full-system acceptance is still separate from this milestone.
+Automated validation: 181 backend and 44 frontend tests, including mocked OAuth state/PKCE, private token refresh, role/project isolation, durable backoff/cursor, review approval, deduplication, restore, migration and safe errors. Browser acceptance uses sample messages, not a real mailbox. Live local connection/collection was subsequently exercised by the human tester; see the dated record below. Full-system acceptance is still separate from this milestone.
+
+### Human-run Gmail acceptance record — 2026-10-28
+
+Passed/reported: SMTP email verification and password recovery; Google test-user setup and local OAuth consent; real Tracker Inbox sample collection visible in a screenshot; reviewed task import and repeat-collection checks; worker startup and automatic sample draft visible in a screenshot; reviewed import and pause test sequence reported complete. The assistant did not perform Google consent or send test emails.
+
+Still separate: live permission-revocation/reconnect failure testing, extended reliability/retention checks, production OAuth verification, worker supervision and whole-system acceptance. Automated malformed-message/permission/backoff checks remain mocked and must not be described as live provider tests. Keep private screenshots and mailbox content out of the public repository.
