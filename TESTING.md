@@ -144,3 +144,14 @@ Automated validation: 181 backend and 44 frontend tests, including mocked OAuth 
 Passed/reported: SMTP email verification and password recovery; Google test-user setup and local OAuth consent; real Tracker Inbox sample collection visible in a screenshot; reviewed task import and repeat-collection checks; worker startup and automatic sample draft visible in a screenshot; reviewed import and pause test sequence reported complete. The assistant did not perform Google consent or send test emails.
 
 Still separate: live permission-revocation/reconnect failure testing, extended reliability/retention checks, production OAuth verification, worker supervision and whole-system acceptance. Automated malformed-message/permission/backoff checks remain mocked and must not be described as live provider tests. Keep private screenshots and mailbox content out of the public repository.
+
+## In-app notifications and sidebar acceptance
+
+1. Sign in and confirm the bell has an accessible unread count. Clicking it or Updates opens the in-app feed. No Slack/email request should be sent. The profile opens Account settings; the old decorative arrow/filler is gone.
+2. Generate an assignment notice with your disposable second-account workflow. Check only its recipient sees it. Mark read/unread and check the bell/count and unread-only filter; reload/sign in again to verify persistence. Mark all read affects only your current visible memberships, not another account.
+3. Open an unfinished task → Remind me → 1 minute → Save. Check Upcoming reminders updates immediately. Wait at least a minute and Refresh updates: one Reminder should appear. Repeated checks must not duplicate it. Close/reopen the browser or restart the server to verify persistence/catch-up; the app does not promise delivery while closed.
+4. Reschedule/cancel your reminder; complete a task before its reminder, and revoke a test member's project access before theirs. Completed/inaccessible tasks must not trigger reminders; revoked notices and task links must be unavailable. A Viewer can set a personal reminder but cannot edit team tasks.
+5. Open Updates once to establish a baseline. Complete a disposable project task, check again, and compare the progress notice with actual completed/total counts. Test category filters and mute progress updates; the first baseline and re-enabling should not replay historical progress.
+6. Verify Open task and View project progress actions, older-update pagination, empty states and a failed read/save. Sign out: private workspace/update data must clear.
+
+Automated checks: 194 backend and 52 frontend tests, including permissions, personal scope, revocation, reminder delivery/cancellation/persistence, progress baselines/deduplication, read/unread state, pagination, failure handling and schema preservation. Browser QA uses isolated sample records. Slack normal sending stays disabled.

@@ -44,6 +44,7 @@ python migrate.py
 python migrate_automation.py
 python migrate_workflows.py
 python migrate_gmail.py
+python migrate_updates.py
 uvicorn main:app --reload
 ```
 
@@ -118,7 +119,7 @@ python -m pytest -q
 python -m pip check
 ```
 
-The frontend has 44 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 181 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; migration 003 adds five empty workflow/security tables; original records and permissions are preserved.
+The frontend has 52 tests for account/session behavior, viewer controls, task editing, failed saves, safe deletion, animation controls and stale-response handling. The backend has 194 tests, including checks that compiled assets load, source files are not served, and a missing frontend build returns a useful error. Frontend requests use the existing API and role checks; migration 003 adds five empty workflow/security tables; original records and permissions are preserved.
 
 Tests use isolated SQLite databases and signing secrets. Coverage includes authentication, permissions, assignments, revocation, nonmember isolation, migration/idempotency, data preservation, and project/task management. PostgreSQL migration/isolation was checked in a temporary schema that was rolled back. React browser checks cover owner and editor sign-in, editing, task progress/activity, team controls, animation and sign-out isolation. Viewer restrictions are also covered by automated frontend/backend tests and the earlier manually verified permissions.
 
@@ -223,3 +224,13 @@ Migration 004 adds empty `gmail_sources` and `gmail_drafts` storage. Connect wit
 Use Gmail drafts on the project card → Collect labelled emails → select up to ten drafts → Review → Confirm & import. Collection saves private owner-only drafts, not tasks; importing shares task details with project members. Existing rules apply in the final reviewed preview, and changes invalidate stale approvals. Attachments/images are not opened, no AI is called, and mail is never sent/modified. Dismiss/restore is available. Identical content from CSV/manual/file imports is skipped, and permanent message receipts prevent reimporting processed/deleted tasks. Processed queue bodies are cleared; pending/dismissed bodies remain private local database data.
 
 Collection scans five messages per page, retains its page cursor durably, limits pending drafts to 100, throttles successful polls to once a minute and backs off failed polls up to one hour. Invalid/oversized messages are blocked with a safe reason. There is no unlimited retry loop in a request. A separate optional local `scripts/gmail_worker.py` process polls only projects explicitly enabled in the UI. It must remain running; this is not an installed operating-system service or public hosting. Stopping the worker or pausing the source stops future polling after current work finishes. Imported tasks always need owner confirmation.
+
+## Updates inside the tracker
+
+The bell and Updates navigation are the primary notification experience. Your existing assignment notices join personal reminders and observed project progress changes in a paged feed with unread filtering, category filters, read/unread controls and mark-all-read. Task links open a permission-checked detail/reminder dialog; project links open the existing measured report. The sidebar profile is a real Account settings button; the non-working decorative arrow and motivational filler are removed. The accepted green design remains.
+
+Use Remind me on an open task, then select 1 minute (quick test), 1 hour or 24 hours. A reminder is personal, persists across restarts, and does not modify task deadlines, assignment or status. Saving again replaces that task's current reminder for you; cancel it from Upcoming reminders. Completed tasks or lost project access suppress delivery. There are at most 50 active reminders per person.
+
+The signed-in interface checks about once a minute while visible, on window focus and on manual refresh. The server materializes due reminders and compares current team completion counts to each user's stored baseline during these checks. The first baseline is quiet; later changed counts create progress notices, with identical completed/total checkpoints deduplicated. Intermediate changes between checks are not a full event log. Project progress can be muted in Updates; assignment preferences remain in Account. When the app is closed, there is no timer, browser push or external delivery: pending reminders catch up on the next check. Slack remains optional and disabled for normal sending.
+
+Migration 005 adds three empty tables for notification preferences, progress baselines and reminders without rewriting existing data. Existing inbox notice storage is reused. New read routes require current membership and recipient ownership; members including Viewers may set only their own reminders for readable tasks. Source credentials, private records and notification content never belong in Git.

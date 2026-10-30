@@ -8,7 +8,7 @@ from sqlalchemy import func, select, delete
 from sqlalchemy.exc import IntegrityError
 
 from auth import Database, get_current_user
-from models import ActivityLog, Project, ProjectMember, Task, User, AutomationRule, InboxNotice, SlackDelivery, GmailSource, GmailDraft
+from models import ActivityLog, Project, ProjectMember, Task, User, AutomationRule, InboxNotice, SlackDelivery, GmailSource, GmailDraft, ProjectProgress, TaskReminder
 from schemas import normalize_email
 
 router = APIRouter(prefix='/api', tags=['Tracker'])
@@ -245,6 +245,7 @@ def edit_project(project_id: int, data: ProjectInput, db: Database, user: Curren
 def delete_task(task_id: int, db: Database, user: CurrentUser):
     task, _ = task_access(db, user, task_id)
     record(db, user, 'Task deleted', json.dumps({'summary': task.title, 'task_id': task.id, 'before': {key: getattr(task,key) for key in ['title','project_id','priority','status','description','assigned_to']}}))
+    db.execute(delete(TaskReminder).where(TaskReminder.task_id==task_id))
     db.delete(task)
     db.commit()
     return Response(status_code=204)
@@ -256,6 +257,7 @@ def delete_project(project_id: int, db: Database, user: CurrentUser):
     if db.scalar(select(Task.id).where(Task.project_id == project_id).limit(1)) is not None:
         raise HTTPException(409, 'This project still has tasks. Move or delete them before deleting the project.')
     record(db, user, 'Project deleted', json.dumps({'summary': project.name, 'project_id': project.id, 'before': {'name': project.name, 'description': project.description}}))
+    db.execute(delete(ProjectProgress).where(ProjectProgress.project_id==project_id))
     db.execute(delete(GmailDraft).where(GmailDraft.project_id == project_id))
     db.execute(delete(GmailSource).where(GmailSource.project_id == project_id))
     db.execute(delete(InboxNotice).where(InboxNotice.project_id==project_id))

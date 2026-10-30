@@ -180,3 +180,25 @@ class GmailDraft(Base):
     state: Mapped[str] = mapped_column(String(20),default='pending')
     problem: Mapped[str] = mapped_column(String(300),default='')
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),default=utc_now)
+
+
+class NotificationSettings(Base):
+    __tablename__ = 'notification_settings'
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'),primary_key=True)
+    progress_enabled: Mapped[bool] = mapped_column(default=True)
+
+
+class ProjectProgress(Base):
+    __tablename__ = 'project_progress'
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'),primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey('projects.id',ondelete='CASCADE'),primary_key=True)
+    total: Mapped[int] = mapped_column(default=0)
+    completed: Mapped[int] = mapped_column(default=0)
+
+
+class TaskReminder(Base):
+    __tablename__ = 'task_reminders'
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'),primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey('tasks.id',ondelete='CASCADE'),primary_key=True)
+    remind_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),index=True)
+    delivered: Mapped[bool] = mapped_column(default=False)
